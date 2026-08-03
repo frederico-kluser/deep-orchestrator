@@ -1,253 +1,482 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR" data-bs-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>deep-orchestrator v3.0.0 — De-Para da Execução</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rUu0W0V8lG8d5O4GZnV5oKq5t4NVBKmBlwFmRrLTgYxHqhXMGJ5hJpmlvYqUHoA" crossorigin="anonymous">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css" rel="stylesheet" integrity="sha384-gj7G1Rjj+0hZHBzZD1lOE7RBiIIb0+ldNXKnZDgT4u5agGhFMEBqPgw1aHJnV+O" crossorigin="anonymous">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css" rel="stylesheet" integrity="sha384-eL5g9uOJ2x0mfHjCJ+BdQXgQxDyj4IuSKUBiLJpVhTSq+qZqM5hD0uOMBZPQJbS" crossorigin="anonymous">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js" integrity="sha384-JhNMRh5OtxgYQS7V+4JhqkE0W3k+j1QrJTJkM+gz6PNObq7Q7KPLJ+SUuLJqJrD" crossorigin="anonymous"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>deep-orchestrator v3.0.0 — De-Para da Migração</title>
+
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous">
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+      integrity="sha384-CK2SzKma4jA5H/MXDUU7i1TqZlCFaD4T01vtyDFvPlD97JQyS+IsSh1nI2EFbpyk"
+      crossorigin="anonymous">
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css"
+      integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH"
+      crossorigin="anonymous">
+
 <style>
-:root,[data-bs-theme="dark"]{--bg:#1a1a2e;--accent:#00d4ff;--success:#00ff88;--warning:#ffaa00;--danger:#ff6b6b;--card-bg:#16213e;--border:#2a2a4a}
-body{background:var(--bg);color:#e0e0e0;font-family:system-ui,-apple-system,sans-serif}
-.hero{background:linear-gradient(135deg,#0f3460 0%,#1a1a2e 50%,#16213e 100%);border-bottom:2px solid var(--accent);padding:3rem 0 2rem}
-.hero h1{color:var(--accent)}.hero .badge{font-size:.9rem}
-.nav-tabs{border-bottom:2px solid var(--border)}.nav-tabs .nav-link{color:#888;border:none}.nav-tabs .nav-link.active{color:var(--accent);background:transparent;border-bottom:2px solid var(--accent)}
-.card{background:var(--card-bg);border:1px solid var(--border)}
-.card-accent{border-left:3px solid var(--accent)}
-.section-title{border-bottom:2px solid var(--accent);padding-bottom:.5rem;margin-bottom:1.5rem;display:inline-block}
-.diff-add{color:var(--success)}.diff-rem{color:var(--danger)}
-.table{color:#e0e0e0;--bs-table-bg:var(--card-bg)}
-pre{background:#0d1117!important;border-radius:8px;padding:1rem}
-.timeline{position:relative;padding-left:2rem}.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--accent)}
-.timeline-item{position:relative;margin-bottom:1.5rem}.timeline-item::before{content:'';position:absolute;left:-1.65rem;top:4px;width:12px;height:12px;border-radius:50%;background:var(--accent)}
-footer{margin-top:3rem;padding:1.5rem 0;border-top:1px solid var(--border);color:#666}
+  [id] { scroll-margin-top: 5rem; }
+
+  pre { position: relative; margin-bottom: 1rem; }
+  pre code.hljs { padding-right: 4rem; border-radius: var(--bs-border-radius); font-size: .875rem; }
+
+  .copy-btn { position: absolute; top: .5rem; right: .5rem; opacity: .4; transition: opacity .15s; }
+  pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+
+  .tab-pane:focus-visible { outline: 0; box-shadow: 0 0 0 .2rem rgba(var(--bs-emphasis-color-rgb), .15); }
+
+  @media print {
+    .nav-tabs, .copy-btn { display: none !important; }
+    .tab-content > .tab-pane { display: block !important; opacity: 1 !important; page-break-inside: avoid; }
+    .tab-pane::before { content: attr(data-print-title); display: block;
+                        font-size: 1.25rem; font-weight: 600; margin: 1.5rem 0 .5rem; }
+  }
 </style>
 </head>
-<body>
 
-<div class="hero text-center">
+<body class="bg-body">
+
+<nav class="navbar navbar-expand-lg sticky-top bg-body-tertiary border-bottom">
   <div class="container">
-    <h1><i class="bi bi-cpu"></i> deep-orchestrator</h1>
-    <p class="lead mb-2">Relatório de Execução — De-Para Completo</p>
-    <div class="d-flex justify-content-center gap-2 flex-wrap">
-      <span class="badge bg-info">v3.0.0</span>
-      <span class="badge bg-secondary">2026-08-03</span>
-      <span class="badge bg-secondary">branch: main</span>
-      <span class="badge bg-success">6 commits</span>
-      <span class="badge bg-warning">3 ondas</span>
-      <span class="badge bg-info">6 sub-agentes</span>
-    </div>
+    <span class="navbar-brand fw-semibold"><i class="bi bi-cpu me-1"></i>deep-orchestrator v3.0.0</span>
+    <span class="navbar-text small text-body-secondary d-none d-md-inline">De-Para da Migração · 6 commits · 3 ondas</span>
   </div>
-</div>
+</nav>
 
-<div class="container mt-4">
-  <ul class="nav nav-tabs" role="tablist">
-    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview" role="tab">Visão Geral</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#waves" role="tab">Ondas</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#files" role="tab">Arquivos</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#beforeafter" role="tab">De-Para</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#decisions" role="tab">Decisões</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#timeline" role="tab">Timeline</button></li>
+<main class="container py-4" style="max-width: 60rem">
+
+  <header class="mb-4">
+    <h1 class="display-6 fw-semibold">deep-orchestrator v2.1.0 → v3.0.0</h1>
+    <p class="lead text-body-secondary">Tudo que mudou no orquestrador multi-agente: busca Brave interna, ECC prompts, ondas ilimitadas, verificação de créditos e HTML explainer automático.</p>
+    <div class="d-flex flex-wrap gap-2">
+      <span class="badge text-bg-secondary">2026-08-03</span>
+      <span class="badge text-bg-secondary">3 ondas · 6 sub-agentes</span>
+      <span class="badge text-bg-secondary">8 arquivos · +3.264 / −57</span>
+    </div>
+  </header>
+
+  <!-- ABAS -->
+  <ul class="nav nav-tabs" id="doc-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-visao-geral" data-bs-toggle="tab" data-bs-target="#pane-visao-geral"
+              type="button" role="tab" aria-controls="pane-visao-geral" aria-selected="true">
+        Visão geral
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-depara" data-bs-toggle="tab" data-bs-target="#pane-depara"
+              type="button" role="tab" aria-controls="pane-depara" aria-selected="false">
+        De-Para
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-capacidades" data-bs-toggle="tab" data-bs-target="#pane-capacidades"
+              type="button" role="tab" aria-controls="pane-capacidades" aria-selected="false">
+        Novas capacidades
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-execucao" data-bs-toggle="tab" data-bs-target="#pane-execucao"
+              type="button" role="tab" aria-controls="pane-execucao" aria-selected="false">
+        Execução
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-arquivos" data-bs-toggle="tab" data-bs-target="#pane-arquivos"
+              type="button" role="tab" aria-controls="pane-arquivos" aria-selected="false">
+        Arquivos
+      </button>
+    </li>
   </ul>
 
-  <div class="tab-content mt-4">
-    <!-- ABA 1: Visão Geral -->
-    <div class="tab-pane fade show active" id="overview" role="tabpanel">
-      <h3 class="section-title">Resumo da Tarefa</h3>
-      <div class="card card-accent mb-4"><div class="card-body">
-        <p class="mb-0"><strong>Tarefa:</strong> Auto-melhoria do deep-orchestrator: integrar ECC prompts, sistema interno de busca Brave, ondas ilimitadas com recálculo dinâmico, verificação de créditos, e HTML explainer automático.</p>
-      </div></div>
+  <div class="tab-content border border-top-0 rounded-bottom p-4" id="doc-tabs-content">
 
-      <h3 class="section-title">Resultado</h3>
-      <div class="row g-3">
-        <div class="col-md-4"><div class="card card-accent"><div class="card-body text-center"><i class="bi bi-diagram-3 fs-1" style="color:var(--accent)"></i><h4 class="mt-2">3 Ondas</h4><p class="text-muted small">Topológicas, sem conflitos</p></div></div></div>
-        <div class="col-md-4"><div class="card card-accent"><div class="card-body text-center"><i class="bi bi-robot fs-1" style="color:var(--accent)"></i><h4 class="mt-2">6 Sub-agentes</h4><p class="text-muted small">+ 3 revisores + 2 fixes</p></div></div></div>
-        <div class="col-md-4"><div class="card card-accent"><div class="card-body text-center"><i class="bi bi-file-earmark-diff fs-1" style="color:var(--accent)"></i><h4 class="mt-2">8 Arquivos</h4><p class="text-muted small"><span class="diff-add">+3,264</span> / <span class="diff-rem">-57</span> linhas</p></div></div></div>
+    <!-- ─── Aba 1: Visão geral ─── -->
+    <div class="tab-pane fade show active" id="pane-visao-geral" role="tabpanel"
+         aria-labelledby="tab-visao-geral" tabindex="0" data-print-title="Visão geral">
+      <h2 class="h4">O que foi feito</h2>
+      <p>O <strong>deep-orchestrator</strong> — o orquestrador autônomo multi-agente — foi profundamente melhorado
+      numa execução auto-referencial: ele orquestrou a própria atualização de v2.1.0 para v3.0.0.</p>
+
+      <div class="alert alert-info d-flex align-items-start gap-2" role="alert">
+        <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
+        <div><strong>Execução auto-referencial:</strong> o deep-orchestrator usou seu próprio fluxo (ANALYZE → PLAN → EXECUTE-ONDA ×3 → COMMIT-FINAL) para melhorar a si mesmo. 3 ondas, 6 sub-agentes, 3 revisores adversariais, 2 fix agents, zero intervenção humana.</div>
       </div>
 
-      <h3 class="section-title mt-4">Novas Capacidades</h3>
+      <h3 class="h5 mt-4">Resumo em números</h3>
       <div class="row g-3">
-        <div class="col-md-6"><div class="card"><div class="card-body"><h5><i class="bi bi-search" style="color:var(--accent)"></i> Busca Brave Interna</h5><p class="small">scripts/brave-search.sh substitui surf-research-skill. API Brave diretamente, com evolução heurística de queries e modo dev. Sem dependência externa de CLI.</p></div></div></div>
-        <div class="col-md-6"><div class="card"><div class="card-body"><h5><i class="bi bi-lightning-charge" style="color:var(--accent)"></i> ECC Prompts</h5><p class="small">7 templates de prompt + 7 skills portados do repositório ECC. System Prompt Base, Planning, Code Review, Security Review, Memory, CI, Clone-Analyze-Discard.</p></div></div></div>
-        <div class="col-md-6"><div class="card"><div class="card-body"><h5><i class="bi bi-infinity" style="color:var(--accent)"></i> Ondas Ilimitadas</h5><p class="small">Recálculo dinâmico após cada onda via REVISOR DE PLANO. Novas sub-tarefas viram novas ondas; termina por CONVERGÊNCIA. Sem limite artificial.</p></div></div></div>
-        <div class="col-md-6"><div class="card"><div class="card-body"><h5><i class="bi bi-shield-check" style="color:var(--accent)"></i> Verificação de Créditos</h5><p class="small">Nova regra R7: check-brave-credits.sh --fail-fast antes de cada onda. Sem créditos → PARE TUDO e aguarde usuário. Única exceção à autonomia total.</p></div></div></div>
-        <div class="col-md-6"><div class="card"><div class="card-body"><h5><i class="bi bi-file-earmark-code" style="color:var(--accent)"></i> HTML Explainer</h5><p class="small">Gerado ao final de cada execução. 6 abas, Bootstrap 5 dark, SRI, 13 placeholders. Documenta de-para completo.</p></div></div></div>
-        <div class="col-md-6"><div class="card"><div class="card-body"><h5><i class="bi bi-journal-code" style="color:var(--accent)"></i> Search Prompts para Dev</h5><p class="small">8 categorias, 5 estratégias de evolução, 7 domínios. Templates otimizados para busca de código, API, erros.</p></div></div></div>
+        <div class="col-sm-4"><div class="card bg-body-tertiary border"><div class="card-body text-center"><i class="bi bi-diagram-3 fs-1 text-info"></i><div class="fs-3 fw-semibold">3</div><small class="text-body-secondary">Ondas topológicas</small></div></div></div>
+        <div class="col-sm-4"><div class="card bg-body-tertiary border"><div class="card-body text-center"><i class="bi bi-robot fs-1 text-info"></i><div class="fs-3 fw-semibold">11</div><small class="text-body-secondary">Sub-agentes (6 exec + 3 review + 2 fix)</small></div></div></div>
+        <div class="col-sm-4"><div class="card bg-body-tertiary border"><div class="card-body text-center"><i class="bi bi-file-earmark-diff fs-1 text-info"></i><div class="fs-3 fw-semibold">8</div><small class="text-body-secondary">Arquivos · +3.264 / −57</small></div></div></div>
       </div>
-    </div>
 
-    <!-- ABA 2: Ondas -->
-    <div class="tab-pane fade" id="waves" role="tabpanel">
-      <h3 class="section-title">Ondas Executadas</h3>
+      <h3 class="h5 mt-4">O que mudou na prática</h3>
       <table class="table">
-        <thead><tr><th>Onda</th><th>Worktree</th><th>Tarefa</th><th>Arquivos</th><th>Status</th></tr></thead>
+        <thead><tr><th>Antes (v2.1.0)</th><th>Depois (v3.0.0)</th></tr></thead>
         <tbody>
-          <tr><td>1</td><td>onda1-brave-search</td><td>Sistema interno de busca Brave</td><td>scripts/brave-search.sh, scripts/check-brave-credits.sh</td><td><span class="badge bg-success">Concluída</span></td></tr>
-          <tr><td>1</td><td>onda1-ecc-prompts</td><td>Port de prompts/skills ECC</td><td>prompts/ecc-prompts.md, prompts/ecc-skills.md</td><td><span class="badge bg-success">Concluída</span></td></tr>
-          <tr><td>1</td><td>onda1-search-prompts</td><td>Prompts de busca para dev</td><td>prompts/search-prompts.md</td><td><span class="badge bg-success">Concluída</span></td></tr>
-          <tr><td>2</td><td>onda2-skill-update</td><td>SKILL.md v2.1.0 → v3.0.0</td><td>SKILL.md</td><td><span class="badge bg-success">Concluída</span></td></tr>
-          <tr><td>2</td><td>onda2-html-explainer</td><td>Template HTML explainer</td><td>templates/html-explainer.html</td><td><span class="badge bg-success">Concluída</span></td></tr>
-          <tr><td>3</td><td>onda3-readme-final</td><td>Atualizar README.md</td><td>README.md</td><td><span class="badge bg-success">Concluída</span></td></tr>
-        </tbody>
-      </table>
-
-      <h3 class="section-title mt-4">Revisão Adversarial</h3>
-      <table class="table">
-        <thead><tr><th>Alvo</th><th>Resultado</th><th>Achados Críticos</th><th>Corrigido</th></tr></thead>
-        <tbody>
-          <tr><td>brave-search</td><td>3 bugs encontrados</td><td>429 loop infinito, --fail-fast quebrado, JSON inválido silencioso</td><td><span class="badge bg-success">✓</span></td></tr>
-          <tr><td>ecc-prompts</td><td>Passou</td><td>1 atribuição menor, inconsistências internas leves</td><td>—</td></tr>
-          <tr><td>search-prompts</td><td>2 problemas</td><td>Seção 4 com claims falsos, overlap de diagnóstico</td><td><span class="badge bg-success">✓</span></td></tr>
-          <tr><td>SKILL.md</td><td>Passou</td><td>Dependência pendente (template — resolvida pelo merge)</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>2 arquivos (README.md + SKILL.md)</td><td>8 arquivos organizados em scripts/, prompts/, templates/</td></tr>
+          <tr><td>Dependência externa: surf-research-skill</td><td>Busca Brave interna: scripts/brave-search.sh</td></tr>
+          <tr><td>Número fixo de ondas no plano</td><td>Ondas ILIMITADAS com recálculo dinâmico por REVISOR DE PLANO</td></tr>
+          <tr><td>Sem verificação de créditos</td><td>Regra R7: check-brave-credits.sh antes de cada onda</td></tr>
+          <tr><td>Prompts genéricos de sub-agente</td><td>14 templates ECC + 8 categorias de busca para dev</td></tr>
+          <tr><td>Saída só em texto</td><td>HTML explainer automático ao final (este arquivo!)</td></tr>
         </tbody>
       </table>
     </div>
 
-    <!-- ABA 3: Arquivos -->
-    <div class="tab-pane fade" id="files" role="tabpanel">
-      <h3 class="section-title">Arquivos Modificados</h3>
-      <table class="table">
-        <thead><tr><th>Arquivo</th><th>Tipo</th><th>Linhas</th><th>Descrição</th></tr></thead>
-        <tbody>
-          <tr><td>scripts/brave-search.sh</td><td><span class="badge bg-info">Novo</span></td><td class="diff-add">+586</td><td>CLI wrapper da Brave Search API (substitui surf-search-normal)</td></tr>
-          <tr><td>scripts/check-brave-credits.sh</td><td><span class="badge bg-info">Novo</span></td><td class="diff-add">+237</td><td>Verificador de créditos Brave (6 estados, --fail-fast)</td></tr>
-          <tr><td>prompts/ecc-prompts.md</td><td><span class="badge bg-info">Novo</span></td><td class="diff-add">+430</td><td>7 templates ECC: System, Planning, Review, Security, Memory, CI, Clone</td></tr>
-          <tr><td>prompts/ecc-skills.md</td><td><span class="badge bg-info">Novo</span></td><td class="diff-add">+362</td><td>7 skills ECC: TDD, Security, Docs, Research, Memory, Clone, Gate</td></tr>
-          <tr><td>prompts/search-prompts.md</td><td><span class="badge bg-info">Novo</span></td><td class="diff-add">+707</td><td>8 categorias, 5 estratégias evolução, 7 domínios dev</td></tr>
-          <tr><td>templates/html-explainer.html</td><td><span class="badge bg-info">Novo</span></td><td class="diff-add">+775</td><td>Template HTML 6 abas, Bootstrap 5 dark theme</td></tr>
-          <tr><td>SKILL.md</td><td><span class="badge bg-warning">Editado</span></td><td class="diff-add">+110</td><td class="diff-rem">-26</td><td>v2.1.0 → v3.0.0: ondas ilimitadas, Brave, ECC, créditos</td></tr>
-          <tr><td>README.md</td><td><span class="badge bg-warning">Editado</span></td><td class="diff-add">+57</td><td class="diff-rem">-31</td><td>Atualizado com todas as features v3.0.0</td></tr>
-        </tbody>
-      </table>
-      <p class="text-muted"><strong>Total:</strong> <span class="diff-add">+3,264</span> / <span class="diff-rem">-57</span> linhas em 8 arquivos</p>
-    </div>
+    <!-- ─── Aba 2: De-Para ─── -->
+    <div class="tab-pane fade" id="pane-depara" role="tabpanel"
+         aria-labelledby="tab-depara" tabindex="0" data-print-title="De-Para">
 
-    <!-- ABA 4: De-Para -->
-    <div class="tab-pane fade" id="beforeafter" role="tabpanel">
-      <h3 class="section-title">Antes → Depois</h3>
+      <h2 class="h4">Antes vs Depois</h2>
       <div class="row g-3">
         <div class="col-md-6">
-          <div class="card"><div class="card-header bg-danger bg-opacity-25"><strong><i class="bi bi-file-earmark"></i> ANTES (v2.1.0)</strong></div>
-          <div class="card-body">
-            <ul class="small">
-              <li>Apenas 2 arquivos: README.md + SKILL.md</li>
-              <li>Dependência do surf-research-skill para busca</li>
-              <li>Número fixo de ondas no plano</li>
-              <li>Sem verificação de créditos</li>
-              <li>Sem templates de prompt avançados</li>
-              <li>Sem relatório visual pós-execução</li>
-              <li>Sub-agentes usavam surf-ai CLI</li>
-            </ul>
-          </div></div>
+          <div class="card border-danger-subtle h-100">
+            <div class="card-header bg-danger bg-opacity-10 text-danger-emphasis fw-semibold"><i class="bi bi-file-earmark me-1"></i>ANTES — v2.1.0</div>
+            <div class="card-body">
+              <ul class="mb-0 small">
+                <li>Apenas <code>README.md</code> + <code>SKILL.md</code></li>
+                <li>Dependência do <code>surf-research-skill</code></li>
+                <li>Número fixo de ondas</li>
+                <li>Sem verificação de créditos</li>
+                <li>Sem templates de prompt avançados</li>
+                <li>Sub-agentes chamavam <code>surf-ai</code> CLI</li>
+                <li>Relatório só em texto no terminal</li>
+              </ul>
+            </div>
+          </div>
         </div>
         <div class="col-md-6">
-          <div class="card"><div class="card-header bg-success bg-opacity-25"><strong><i class="bi bi-file-earmark-check"></i> DEPOIS (v3.0.0)</strong></div>
-          <div class="card-body">
-            <ul class="small">
-              <li>8 arquivos organizados em scripts/, prompts/, templates/</li>
-              <li>Busca Brave interna (brave-search.sh + check-brave-credits.sh)</li>
-              <li>Ondas ILIMITADAS com recálculo dinâmico (REVISOR DE PLANO)</li>
-              <li>Verificação de créditos antes de cada onda (regra R7)</li>
-              <li>14 templates/skills ECC + 8 categorias de busca dev</li>
-              <li>HTML explainer automático ao final (6 abas, dark theme)</li>
-              <li>Sub-agentes usam scripts/brave-search.sh</li>
-            </ul>
-          </div></div>
+          <div class="card border-success-subtle h-100">
+            <div class="card-header bg-success bg-opacity-10 text-success-emphasis fw-semibold"><i class="bi bi-file-earmark-check me-1"></i>DEPOIS — v3.0.0</div>
+            <div class="card-body">
+              <ul class="mb-0 small">
+                <li>8 arquivos em <code>scripts/</code> <code>prompts/</code> <code>templates/</code></li>
+                <li>Busca Brave interna (<code>brave-search.sh</code>)</li>
+                <li>Ondas ILIMITADAS com recálculo dinâmico</li>
+                <li>Verificação pré-onda (<code>check-brave-credits.sh</code>)</li>
+                <li>14 templates/skills ECC + 8 categorias dev</li>
+                <li>Sub-agentes chamam <code>scripts/brave-search.sh</code></li>
+                <li>HTML explainer (este arquivo) ao final</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
-      <h3 class="section-title mt-4">Impacto das Mudanças</h3>
-      <div class="table-responsive"><table class="table">
-        <thead><tr><th>Mudança</th><th>Impacto para o Usuário</th></tr></thead>
-        <tbody>
-          <tr><td><strong>Busca Brave interna</strong></td><td>Não precisa mais instalar/configurar surf-research-skill. Basta export BRAVE_API_KEY. ~$5/mês free credit cobre uso normal.</td></tr>
-          <tr><td><strong>Ondas ilimitadas</strong></td><td>Tarefas complexas não são mais truncadas. O orquestrador continua gerando ondas até não haver mais sub-tarefas pendentes.</td></tr>
-          <tr><td><strong>ECC Prompts</strong></td><td>Sub-agentes usam prompts mais sofisticados para planejamento, revisão de código, segurança e memória.</td></tr>
-          <tr><td><strong>Verificação de créditos</strong></td><td>Nunca mais perde tempo com sub-agentes que falham por falta de créditos. O orquestrador verifica ANTES de disparar.</td></tr>
-          <tr><td><strong>Search Prompts Dev</strong></td><td>Buscas mais precisas para desenvolvimento: API lookup, error debug, arquitetura, segurança, performance.</td></tr>
-          <tr><td><strong>HTML Explainer</strong></td><td>Ao final de cada execução, um relatório visual completo em HTML documenta tudo que foi feito.</td></tr>
-        </tbody>
-      </table></div>
-    </div>
-
-    <!-- ABA 5: Decisões -->
-    <div class="tab-pane fade" id="decisions" role="tabpanel">
-      <h3 class="section-title">Decisões Tomadas Autonomamente</h3>
-      <div class="list-group">
-        <div class="list-group-item bg-transparent text-light border-secondary"><strong>1. Interface brave-search.sh compatível com surf-search-normal</strong><br><small class="text-muted">Mesmas flags (--task, --goal, --insights, --deliverable, --json) para migração zero-atrito. Sub-agentes não precisam aprender nova interface.</small></div>
-        <div class="list-group-item bg-transparent text-light border-secondary"><strong>2. Evolução de queries heurística (não LLM)</strong><br><small class="text-muted">A evolução usa algoritmo de contagem de palavras + sufixos rotativos, sem depender de LLM. Mais rápido (sem round-trip de API), sem custo de tokens.</small></div>
-        <div class="list-group-item bg-transparent text-light border-secondary"><strong>3. BRAVE_API_KEY como variável de ambiente</strong><br><small class="text-muted">Scripts leem do ambiente, consistente com outras credenciais. Sem arquivo de config separado.</small></div>
-        <div class="list-group-item bg-transparent text-light border-secondary"><strong>4. CREDITS_LOW = sem créditos (com --fail-fast)</strong><br><small class="text-muted">Interpretação conservadora: se há menos de 100 créditos, trata como insuficiente. Evita que sub-agentes comecem e falhem no meio.</small></div>
-        <div class="list-group-item bg-transparent text-light border-secondary"><strong>5. System-ui como fonte (Google Fonts sem SRI)</strong><br><small class="text-muted">HTML explainer usa system-ui para manter integridade SRI. Google Fonts não oferece hash de integridade.</small></div>
-        <div class="list-group-item bg-transparent text-light border-secondary"><strong>6. Template HTML com placeholders begin/end (não só tokens)</strong><br><small class="text-muted">Slots com marcadores de bloco permitem substituir seções inteiras (ex: tabela de ondas), não só valores pontuais.</small></div>
+      <h3 class="h5 mt-4">Impacto por mudança</h3>
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr><th>Mudança</th><th>O que significa para o usuário</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Busca Brave interna</strong></td><td>Não precisa instalar surf-research-skill. Basta <code>export BRAVE_API_KEY=...</code> (~$5/mês free credit).</td></tr>
+            <tr><td><strong>Ondas ilimitadas</strong></td><td>Tarefas complexas não são truncadas. O orquestrador gera ondas até convergência.</td></tr>
+            <tr><td><strong>ECC Prompts</strong></td><td>Sub-agentes usam prompts mais sofisticados para planejamento, code review, segurança e memória.</td></tr>
+            <tr><td><strong>Verificação de créditos</strong></td><td>Nunca perde tempo com sub-agentes que falham por API sem créditos.</td></tr>
+            <tr><td><strong>Search Prompts para dev</strong></td><td>Buscas mais precisas: API lookup, error debug, arquitetura, segurança, performance.</td></tr>
+            <tr><td><strong>HTML Explainer</strong></td><td>Relatório visual completo ao final de cada execução, com de-para documentado.</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- ABA 6: Timeline -->
-    <div class="tab-pane fade" id="timeline" role="tabpanel">
-      <h3 class="section-title">Timeline da Execução</h3>
-      <div class="timeline">
-        <div class="timeline-item">
-          <h6>Fase 1: ANALYZE</h6>
-          <p class="text-muted small">Leitura do prompt, mapeamento do repositório (2 arquivos), classificação greenfield/brownfield, definição de branch principal (main) e diretório de worktrees.</p>
+    <!-- ─── Aba 3: Novas capacidades ─── -->
+    <div class="tab-pane fade" id="pane-capacidades" role="tabpanel"
+         aria-labelledby="tab-capacidades" tabindex="0" data-print-title="Novas capacidades">
+
+      <h2 class="h4">As 6 novas capacidades</h2>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card bg-body-tertiary border h-100">
+            <div class="card-body">
+              <h3 class="h6"><i class="bi bi-search text-info me-1"></i>Busca Brave Interna</h3>
+              <p class="small text-body-secondary mb-2"><code>scripts/brave-search.sh</code> — CLI wrapper direto da Brave Search API. Substitui surf-research-skill. Evolução heurística de queries, modo dev com keywords otimizadas. Flags: <code>--task</code> <code>--goal</code> <code>--insights</code> <code>--json</code> <code>--dev-mode</code> <code>--max-evolutions N</code>.</p>
+              <span class="badge text-bg-secondary">586 linhas</span>
+            </div>
+          </div>
         </div>
-        <div class="timeline-item">
-          <h6>Fase 2: PLAN</h6>
-          <p class="text-muted small">Decomposição em 3 ondas topológicas (6 sub-tarefas). Mapa de propriedade de arquivos sem conflitos. Nomes de worktrees batizados (onda1-brave-search, onda1-ecc-prompts, etc.).</p>
+        <div class="col-md-6">
+          <div class="card bg-body-tertiary border h-100">
+            <div class="card-body">
+              <h3 class="h6"><i class="bi bi-shield-check text-info me-1"></i>Verificação de Créditos</h3>
+              <p class="small text-body-secondary mb-2"><code>scripts/check-brave-credits.sh</code> — 6 estados (CREDITS_OK, LOW, NONE, RATE_LIMITED, UNKNOWN, CONFIG_ERROR). <code>--fail-fast</code> para gate do orquestrador. Nova regra R7: sem créditos = PARE TUDO.</p>
+              <span class="badge text-bg-secondary">237 linhas</span>
+            </div>
+          </div>
         </div>
-        <div class="timeline-item">
-          <h6>Onda 1 — Fundação (3 agentes paralelos)</h6>
-          <p class="text-muted small"><strong>onda1-brave-search:</strong> brave-search.sh (586 ln) + check-brave-credits.sh (237 ln)<br>
-          <strong>onda1-ecc-prompts:</strong> ecc-prompts.md (430 ln) + ecc-skills.md (362 ln)<br>
-          <strong>onda1-search-prompts:</strong> search-prompts.md (707 ln)<br>
-          → Revisão adversarial: 2 bugs críticos encontrados → Fix agents → Gate verde → Squash-merge → Limpeza</p>
+        <div class="col-md-6">
+          <div class="card bg-body-tertiary border h-100">
+            <div class="card-body">
+              <h3 class="h6"><i class="bi bi-lightning-charge text-info me-1"></i>ECC Prompts</h3>
+              <p class="small text-body-secondary mb-2"><code>prompts/ecc-prompts.md</code> — 7 templates: System Prompt Base, Planning (Plan First), Code Review (Fresh Context), Security Review (AgentShield), Memory Persistence, Continuous Improvement, Clone-Analyze-Discard.</p>
+              <span class="badge text-bg-secondary">430 linhas</span>
+            </div>
+          </div>
         </div>
-        <div class="timeline-item">
-          <h6>Onda 2 — Integração (2 agentes paralelos)</h6>
-          <p class="text-muted small"><strong>onda2-html-explainer:</strong> html-explainer.html (775 ln)<br>
-          <strong>onda2-skill-update:</strong> SKILL.md v3.0.0 (+110/-26)<br>
-          → Revisão adversarial: dependência pendente (resolvida pelo merge) → Gate verde → Squash-merge → Limpeza</p>
+        <div class="col-md-6">
+          <div class="card bg-body-tertiary border h-100">
+            <div class="card-body">
+              <h3 class="h6"><i class="bi bi-tools text-info me-1"></i>ECC Skills</h3>
+              <p class="small text-body-secondary mb-2"><code>prompts/ecc-skills.md</code> — 7 skills portadas com frontmatter YAML: TDD Workflow, Security Audit, Documentation Generator, Research Deep-Dive, Memory Vault, Clone &amp; Analyze, Code Quality Gate.</p>
+              <span class="badge text-bg-secondary">362 linhas</span>
+            </div>
+          </div>
         </div>
-        <div class="timeline-item">
-          <h6>Onda 3 — Finalização (1 agente)</h6>
-          <p class="text-muted small"><strong>onda3-readme-final:</strong> README.md (+57/-31)<br>
-          → Squash-merge → Limpeza</p>
+        <div class="col-md-6">
+          <div class="card bg-body-tertiary border h-100">
+            <div class="card-body">
+              <h3 class="h6"><i class="bi bi-journal-code text-info me-1"></i>Search Prompts para Dev</h3>
+              <p class="small text-body-secondary mb-2"><code>prompts/search-prompts.md</code> — 8 categorias (API lookup, erro, arquitetura, migração, segurança, performance, comparação, exemplos), 5 estratégias de evolução, 7 domínios (frontend, backend, devops, data, ML/AI, mobile, security).</p>
+              <span class="badge text-bg-secondary">707 linhas</span>
+            </div>
+          </div>
         </div>
-        <div class="timeline-item">
-          <h6>Fase 4: COMMIT-FINAL</h6>
-          <p class="text-muted small">Remoção do TASK_PLAN.md. Geração do EXPLAINER.html. Varredura final de worktrees (0 remanescentes). Commit final com git status limpo.</p>
+        <div class="col-md-6">
+          <div class="card bg-body-tertiary border h-100">
+            <div class="card-body">
+              <h3 class="h6"><i class="bi bi-infinity text-info me-1"></i>Ondas Ilimitadas</h3>
+              <p class="small text-body-secondary mb-2">Recálculo dinâmico após cada onda via sub-agente REVISOR DE PLANO. Novas sub-tarefas viram novas ondas; termina por CONVERGÊNCIA. Sem limite artificial de ondas. Integrado ao SKILL.md.</p>
+              <span class="badge text-bg-secondary">Fase 3 do fluxo</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- ─── Aba 4: Execução ─── -->
+    <div class="tab-pane fade" id="pane-execucao" role="tabpanel"
+         aria-labelledby="tab-execucao" tabindex="0" data-print-title="Execução">
+
+      <h2 class="h4">Ondas e agentes</h2>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead><tr><th>Onda</th><th>Worktree</th><th>Tarefa</th><th>Arquivos</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>onda1-brave-search</td><td>Sistema interno de busca Brave</td><td><code>scripts/brave-search.sh</code> <code>scripts/check-brave-credits.sh</code></td></tr>
+            <tr><td>1</td><td>onda1-ecc-prompts</td><td>Port de prompts/skills ECC</td><td><code>prompts/ecc-prompts.md</code> <code>prompts/ecc-skills.md</code></td></tr>
+            <tr><td>1</td><td>onda1-search-prompts</td><td>Prompts de busca para dev</td><td><code>prompts/search-prompts.md</code></td></tr>
+            <tr><td>2</td><td>onda2-skill-update</td><td>SKILL.md v2.1.0 → v3.0.0</td><td><code>SKILL.md</code> (+110/−26)</td></tr>
+            <tr><td>2</td><td>onda2-html-explainer</td><td>Template HTML explainer</td><td><code>templates/html-explainer.html</code></td></tr>
+            <tr><td>3</td><td>onda3-readme-final</td><td>Atualizar README.md</td><td><code>README.md</code> (+57/−31)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="h5 mt-4">Revisão adversarial</h3>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead><tr><th>Alvo</th><th class="text-end">Bugs encontrados</th><th>Achados</th><th class="text-center">Corrigido</th></tr></thead>
+          <tbody>
+            <tr><td>brave-search</td><td class="text-end text-danger-emphasis fw-semibold">3</td><td>429 loop infinito, --fail-fast quebrado, JSON inválido silencioso</td><td class="text-center text-success-emphasis"><i class="bi bi-check-lg"></i></td></tr>
+            <tr><td>ecc-prompts</td><td class="text-end">0</td><td>1 atribuição menor, inconsistências internas leves</td><td class="text-center text-body-secondary">—</td></tr>
+            <tr><td>search-prompts</td><td class="text-end text-danger-emphasis fw-semibold">2</td><td>Seção 4 com claims falsos, overlap de diagnóstico</td><td class="text-center text-success-emphasis"><i class="bi bi-check-lg"></i></td></tr>
+            <tr><td>SKILL.md v3.0.0</td><td class="text-end">0</td><td>Dependência pendente (resolvida pelo merge)</td><td class="text-center text-success-emphasis"><i class="bi bi-check-lg"></i></td></tr>
+            <tr><td>html-explainer</td><td class="text-end">0</td><td>Nada a refutar</td><td class="text-center text-body-secondary">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="h5 mt-4">Linha do tempo</h3>
+      <ol class="list-group list-group-numbered list-group-flush">
+        <li class="list-group-item bg-transparent text-body border-secondary-subtle d-flex justify-content-between align-items-start">
+          <div class="ms-2 me-auto"><strong>Fase 1 — ANALYZE</strong><br><small class="text-body-secondary">Leitura do prompt, mapeamento do repositório (2 arquivos), classificação greenfield/brownfield.</small></div>
+        </li>
+        <li class="list-group-item bg-transparent text-body border-secondary-subtle d-flex justify-content-between align-items-start">
+          <div class="ms-2 me-auto"><strong>Fase 2 — PLAN</strong><br><small class="text-body-secondary">Decomposição em 3 ondas topológicas (6 sub-tarefas). Mapa de propriedade sem conflitos. Worktrees batizadas.</small></div>
+        </li>
+        <li class="list-group-item bg-transparent text-body border-secondary-subtle d-flex justify-content-between align-items-start">
+          <div class="ms-2 me-auto"><strong>Onda 1 — Fundação</strong><br><small class="text-body-secondary">3 agentes paralelos: brave-search, ecc-prompts, search-prompts. Revisão adversarial encontrou bugs → fix agents corrigiram.</small></div>
+        </li>
+        <li class="list-group-item bg-transparent text-body border-secondary-subtle d-flex justify-content-between align-items-start">
+          <div class="ms-2 me-auto"><strong>Onda 2 — Integração</strong><br><small class="text-body-secondary">2 agentes paralelos: skill-update (SKILL.md v3.0.0), html-explainer (template 6 abas).</small></div>
+        </li>
+        <li class="list-group-item bg-transparent text-body border-secondary-subtle d-flex justify-content-between align-items-start">
+          <div class="ms-2 me-auto"><strong>Onda 3 — Finalização</strong><br><small class="text-body-secondary">README.md atualizado com todas as features v3.0.0.</small></div>
+        </li>
+        <li class="list-group-item bg-transparent text-body border-secondary-subtle d-flex justify-content-between align-items-start">
+          <div class="ms-2 me-auto"><strong>Fase 4 — COMMIT-FINAL</strong><br><small class="text-body-secondary">TASK_PLAN.md removido. EXPLAINER.html gerado. Worktrees e branches limpos. Repositório 100% limpo.</small></div>
+        </li>
+      </ol>
+
+      <h3 class="h5 mt-4">Decisões autônomas</h3>
+      <div class="accordion" id="decisoes">
+        <div class="accordion-item bg-body-tertiary border-secondary-subtle">
+          <div class="accordion-header"><button class="accordion-button collapsed bg-body-tertiary text-body" type="button" data-bs-toggle="collapse" data-bs-target="#dec-1">1. Interface brave-search.sh compatível com surf-search-normal</button></div>
+          <div id="dec-1" class="accordion-collapse collapse" data-bs-parent="#decisoes"><div class="accordion-body small text-body-secondary">Mesmas flags (--task, --goal, --insights, --deliverable, --json) para migração zero-atrito. Sub-agentes não precisam aprender nova interface.</div></div>
+        </div>
+        <div class="accordion-item bg-body-tertiary border-secondary-subtle">
+          <div class="accordion-header"><button class="accordion-button collapsed bg-body-tertiary text-body" type="button" data-bs-toggle="collapse" data-bs-target="#dec-2">2. Evolução de queries heurística (não LLM)</button></div>
+          <div id="dec-2" class="accordion-collapse collapse" data-bs-parent="#decisoes"><div class="accordion-body small text-body-secondary">Algoritmo de contagem de palavras + sufixos rotativos, sem dependência de LLM. Mais rápido (sem round-trip de API), sem custo de tokens.</div></div>
+        </div>
+        <div class="accordion-item bg-body-tertiary border-secondary-subtle">
+          <div class="accordion-header"><button class="accordion-button collapsed bg-body-tertiary text-body" type="button" data-bs-toggle="collapse" data-bs-target="#dec-3">3. BRAVE_API_KEY como variável de ambiente</button></div>
+          <div id="dec-3" class="accordion-collapse collapse" data-bs-parent="#decisoes"><div class="accordion-body small text-body-secondary">Scripts leem do ambiente, consistente com outras credenciais. Sem arquivo de config separado.</div></div>
+        </div>
+        <div class="accordion-item bg-body-tertiary border-secondary-subtle">
+          <div class="accordion-header"><button class="accordion-button collapsed bg-body-tertiary text-body" type="button" data-bs-toggle="collapse" data-bs-target="#dec-4">4. CREDITS_LOW tratado como sem créditos (com --fail-fast)</button></div>
+          <div id="dec-4" class="accordion-collapse collapse" data-bs-parent="#decisoes"><div class="accordion-body small text-body-secondary">Interpretação conservadora: < 100 créditos = insuficiente. Evita que sub-agentes comecem e falhem no meio.</div></div>
+        </div>
+        <div class="accordion-item bg-body-tertiary border-secondary-subtle">
+          <div class="accordion-header"><button class="accordion-button collapsed bg-body-tertiary text-body" type="button" data-bs-toggle="collapse" data-bs-target="#dec-5">5. system-ui como fonte (Google Fonts sem SRI)</button></div>
+          <div id="dec-5" class="accordion-collapse collapse" data-bs-parent="#decisoes"><div class="accordion-body small text-body-secondary">HTML explainer usa system-ui para manter integridade SRI. Google Fonts não oferece hash de integridade.</div></div>
+        </div>
+        <div class="accordion-item bg-body-tertiary border-secondary-subtle">
+          <div class="accordion-header"><button class="accordion-button collapsed bg-body-tertiary text-body" type="button" data-bs-toggle="collapse" data-bs-target="#dec-6">6. Template HTML com slots begin/end (não só tokens inline)</button></div>
+          <div id="dec-6" class="accordion-collapse collapse" data-bs-parent="#decisoes"><div class="accordion-body small text-body-secondary">Slots com marcadores de bloco permitem substituir seções inteiras (ex: tabela de ondas), não só valores pontuais.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Aba 5: Arquivos ─── -->
+    <div class="tab-pane fade" id="pane-arquivos" role="tabpanel"
+         aria-labelledby="tab-arquivos" tabindex="0" data-print-title="Arquivos">
+
+      <h2 class="h4">Arquivos modificados</h2>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead><tr><th>Arquivo</th><th class="text-center">Status</th><th class="text-end">+</th><th class="text-end">−</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code>scripts/brave-search.sh</code></td><td class="text-center"><span class="badge text-bg-info">Novo</span></td><td class="text-end text-success-emphasis">586</td><td class="text-end">0</td><td>CLI wrapper da Brave Search API</td></tr>
+            <tr><td><code>scripts/check-brave-credits.sh</code></td><td class="text-center"><span class="badge text-bg-info">Novo</span></td><td class="text-end text-success-emphasis">237</td><td class="text-end">0</td><td>Verificador de créditos (6 estados)</td></tr>
+            <tr><td><code>prompts/ecc-prompts.md</code></td><td class="text-center"><span class="badge text-bg-info">Novo</span></td><td class="text-end text-success-emphasis">430</td><td class="text-end">0</td><td>7 templates ECC</td></tr>
+            <tr><td><code>prompts/ecc-skills.md</code></td><td class="text-center"><span class="badge text-bg-info">Novo</span></td><td class="text-end text-success-emphasis">362</td><td class="text-end">0</td><td>7 skills ECC portadas</td></tr>
+            <tr><td><code>prompts/search-prompts.md</code></td><td class="text-center"><span class="badge text-bg-info">Novo</span></td><td class="text-end text-success-emphasis">707</td><td class="text-end">0</td><td>8 categorias, 5 estratégias, 7 domínios</td></tr>
+            <tr><td><code>templates/html-explainer.html</code></td><td class="text-center"><span class="badge text-bg-info">Novo</span></td><td class="text-end text-success-emphasis">775</td><td class="text-end">0</td><td>Template HTML 6 abas (padrão html-explainer)</td></tr>
+            <tr><td><code>SKILL.md</code></td><td class="text-center"><span class="badge text-bg-warning">Editado</span></td><td class="text-end text-success-emphasis">110</td><td class="text-end text-danger-emphasis">26</td><td>v2.1.0 → v3.0.0: ondas ilimitadas, Brave, ECC, créditos</td></tr>
+            <tr><td><code>README.md</code></td><td class="text-center"><span class="badge text-bg-warning">Editado</span></td><td class="text-end text-success-emphasis">57</td><td class="text-end text-danger-emphasis">31</td><td>Atualizado com features v3.0.0</td></tr>
+          </tbody>
+          <tfoot><tr class="fw-semibold"><td colspan="2">Total</td><td class="text-end text-success-emphasis">+3,264</td><td class="text-end text-danger-emphasis">−57</td><td>8 arquivos</td></tr></tfoot>
+        </table>
+      </div>
+
+      <h3 class="h5 mt-4">Estrutura do repositório</h3>
+      <pre><code class="language-text">deep-orchestrator/
+├── EXPLAINER.html                 ← Este arquivo
+├── README.md                      ← Atualizado v3.0.0
+├── SKILL.md                       ← Orquestrador v3.0.0
+├── scripts/
+│   ├── brave-search.sh            ← Busca Brave (substitui surf-search-normal)
+│   └── check-brave-credits.sh     ← Verificador de créditos
+├── prompts/
+│   ├── ecc-prompts.md             ← 7 templates ECC
+│   ├── ecc-skills.md              ← 7 skills ECC portadas
+│   └── search-prompts.md          ← Prompts de busca para dev
+└── templates/
+    └── html-explainer.html        ← Template do explainer (padrão html-explainer)</code></pre>
+
+      <h3 class="h5 mt-4">Commits</h3>
+      <pre><code class="language-text">83136a3 docs: EXPLAINER.html — de-para completo da migração v2.1.0 → v3.0.0
+660ee90 onda3-readme-final: README.md atualizado para v3.0.0
+58978e0 onda2-skill-update: SKILL.md v2.1.0 → v3.0.0 com todas as integrações
+11dda53 onda2-html-explainer: template HTML explainer com 6 abas e 13 placeholders
+d7d69cb onda1-search-prompts: sistema de prompts de busca otimizados para dev
+52c48c0 onda1-ecc-prompts: templates de prompt e skills portados do ECC
+acfd494 onda1-brave-search: sistema interno de busca Brave com verificador de créditos</code></pre>
+    </div>
+
   </div>
-</div>
 
-<footer class="text-center">
-  <div class="container">
-    <p class="mb-0">deep-orchestrator v3.0.0 · Executado em 2026-08-03 · 6 commits squash · 8 arquivos · 3 ondas</p>
-    <p class="small text-muted">🤖 Gerado automaticamente pelo orquestrador ao final da execução</p>
-  </div>
-</footer>
+  <footer class="text-body-secondary small border-top mt-5 pt-3">
+    deep-orchestrator v3.0.0 · Executado em 2026-08-03 · 6 commits squash · 3 ondas · 0 worktrees remanescentes.
+    Documento de arquivo único — salve, mande por anexo, abra offline.
+  </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-uQ3+dEuxCG4+BgGYQfJ0G48FENjeJ+xqG4W9XKHcZkwTnR9EwJXhgGqk4HJJxHN" crossorigin="anonymous"></script>
-<script>hljs.highlightAll();</script>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"
+        integrity="sha384-RH2xi4eIQ/gjtbs9fUXM68sLSi99C7ZWBRX1vDrVv6GQXRibxXLbwO2NGZB74MbU"
+        crossorigin="anonymous"></script>
+
 <script>
-// Deep-link: abrir aba pela URL hash
-document.addEventListener('DOMContentLoaded', () => {
-  const hash = window.location.hash;
-  if (hash) {
-    const tab = document.querySelector(`[data-bs-target="${hash}"]`);
-    if (tab) new bootstrap.Tab(tab).show();
+(function () {
+  'use strict';
+
+  var sources = new WeakMap();
+  document.querySelectorAll('pre > code').forEach(function (code) {
+    sources.set(code, code.textContent.replace(/\n$/, ''));
+  });
+
+  if (window.hljs) hljs.highlightAll();
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(function () { return true; },
+                                                      function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
   }
-  // Atualizar hash ao trocar de aba
-  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(t => {
-    t.addEventListener('shown.bs.tab', e => {
-      window.location.hash = e.target.getAttribute('data-bs-target');
+
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  document.querySelectorAll('pre > code').forEach(function (code) {
+    var pre = code.parentElement;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-outline-secondary copy-btn';
+    btn.innerHTML = '<i class="bi bi-clipboard"></i>';
+    btn.setAttribute('aria-label', 'Copiar código');
+    btn.addEventListener('click', function () {
+      copyText(sources.get(code) || code.textContent).then(function (ok) {
+        btn.innerHTML = ok ? '<i class="bi bi-check-lg"></i>' : '<i class="bi bi-x-lg"></i>';
+        btn.classList.toggle('btn-outline-success', ok);
+        btn.classList.toggle('btn-outline-danger', !ok);
+        btn.classList.remove('btn-outline-secondary');
+        setTimeout(function () {
+          btn.innerHTML = '<i class="bi bi-clipboard"></i>';
+          btn.className = 'btn btn-sm btn-outline-secondary copy-btn';
+        }, 1500);
+      });
+    });
+    pre.appendChild(btn);
+  });
+
+  var tabs = document.querySelectorAll('[data-bs-toggle="tab"]');
+  if (!tabs.length) return;
+
+  function activateFromHash() {
+    var hash = window.location.hash;
+    if (!hash || hash.length < 2) return;
+    var target = document.querySelector(hash);
+    if (!target) return;
+    var pane = target.closest('.tab-pane') || (target.classList.contains('tab-pane') ? target : null);
+    if (!pane) return;
+    var trigger = document.querySelector('[data-bs-target="#' + CSS.escape(pane.id) + '"]');
+    if (trigger) bootstrap.Tab.getOrCreateInstance(trigger).show();
+    var scrollTo = target !== pane ? target : (trigger && trigger.closest('[role="tablist"]')) || pane;
+    requestAnimationFrame(function () { scrollTo.scrollIntoView({ block: 'start' }); });
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('shown.bs.tab', function (e) {
+      var id = (e.target.getAttribute('data-bs-target') || '').slice(1);
+      if (id) history.replaceState(null, '', '#' + id);
     });
   });
-});
+
+  window.addEventListener('hashchange', activateFromHash);
+  activateFromHash();
+})();
 </script>
 </body>
 </html>
