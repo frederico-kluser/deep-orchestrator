@@ -6,7 +6,9 @@ description: >-
   worktrees isoladas (uma por sub-agente), aplica revisão
   adversarial, integra via squash-merge um a um com gate entre merges, remove
   worktree + branch + commits intermediários ao fim de cada onda, e commita tudo
-  ao final sem perguntar nada ao usuário. Pesquisa web via Brave Search API INTERNA
+  ao final sem perguntar nada ao usuário. Inclui TESTING SUBWAVES assíncronas
+  (test-ondaN-*) que rodam em background após cada onda e têm seus resultados
+  integrados na onda seguinte (ou no COMMIT-FINAL para a última onda). Pesquisa web via Brave Search API INTERNA
   (scripts/brave-search.sh), com verificação de créditos antes de cada onda
   (scripts/check-brave-credits.sh) e templates de prompt avançados ECC
   (prompts/ecc-prompts.md). Cada sub-agente invoca o project-router
@@ -52,7 +54,7 @@ allowed-tools:
 model: inherit
 effort: xhigh
 metadata:
-  version: "3.0.0"
+  version: "3.1.0"
   created: "2026-08-02"
   updated: "2026-08-03"
   project: "~/Projects/deep-orchestrator"
@@ -153,10 +155,20 @@ metadata:
         <step order="2">Use <tool>project_report</tool> para entender a estrutura
           do repo (fallback se indisponível: Glob + Read nos arquivos-chave)</step>
         <step order="3">Identifique subsistemas, arquivos-chave e dependências</step>
-        <step order="4">Localize e leia o project-router skill do repositório
-          (<path>.claude/skills/project-router/SKILL.md</path> ou
-           <path>.agents/skills/project-router/SKILL.md</path>) —
-          você instruirá cada sub-agente a fazer o mesmo</step>
+        <step order="4"><strong>PROJECT-ROUTER:</strong> Verifique se o
+          project-router skill existe no repositório em UMA destas localizações:
+          <path>.claude/skills/project-router/SKILL.md</path> ou
+          <path>.agents/skills/project-router/SKILL.md</path>.
+          <substeps>
+            <substep>Se EXISTE: Leia-o COMPLETAMENTE. Para CADA skill que ele
+              referenciar, leia também o SKILL.md dessa skill — você precisa
+              ENTENDER o mapa de conhecimento completo para instruir os
+              sub-agentes corretamente. Anote no TASK_PLAN.md: "project-router
+              ENCONTRADO — contém X skills, Y convenções."</substep>
+            <substep>Se NÃO EXISTE: Registre no TASK_PLAN.md: "Project-router
+              ausente — sub-agentes prosseguirão sem." e prossiga. A ausência
+              do project-router NÃO bloqueia a execução.</substep>
+          </substeps></step>
         <step order="5">Classifique a tarefa: é greenfield (código NOVO) ou brownfield
           (modifica código existente)? Se brownfield, identifique os golden masters
           ou testes de caracterização existentes que NÃO podem ser quebrados</step>
@@ -222,6 +234,38 @@ metadata:
         um sub-agente REVISOR DE PLANO declare CONVERGÊNCIA (não há mais
         sub-tarefas pendentes)</repeat>
       <steps>
+        <step order="0"><strong>PROCESSAR TESTING SUBWAVE PENDENTE
+          (da onda anterior):</strong>
+          <substeps>
+            <substep><strong>VERIFICAR:</strong> Consulte o TASK_PLAN.md. Se NÃO existe
+              a seção "Testing Subwave Onda N-1 — PENDENTE", este passo é NO-OP
+              (é a primeira onda, ou a onda anterior não gerou testing subwave).
+              Se EXISTE, prossiga.</substep>
+            <substep><strong>BARREIRA:</strong> Aguarde TODOS os sub-agentes de teste
+              da onda anterior terminarem (foram disparados em background ao fim
+              da onda anterior).</substep>
+            <substep><strong>REVISÃO DE TESTES:</strong> Para cada agente de teste,
+              dispare um revisor adversarial FRESCO que recebe APENAS o diff do
+              agente de teste + o handoff da onda original. O revisor avalia:
+              Os testes cobrem os comportamentos descritos? Os testes PASSAM de
+              fato (evidência real)? Há falsos positivos (testes que passam sem
+              exercitar o código)? Há gaps (edge cases não testados)?</substep>
+            <substep><strong>SQUASH-MERGE + GATE + LIMPEZA (testes):</strong>
+              Mesmo fluxo do passo 7: para cada agente de teste,
+              git merge --squash wt/test-ondaN-&lt;foco&gt;, commit com mensagem
+              "test-ondaN-&lt;foco&gt;: adiciona testes para &lt;desc&gt;", gate
+              (build + testes + linter), e SÓ com gate verde a limpeza
+              (worktree remove + branch -D).</substep>
+            <substep><strong>ATUALIZAR TASK_PLAN.md:</strong> Marque a seção como
+              "Testing Subwave Onda N-1 — CONCLUÍDA". Se algum agente de teste
+              falhou (gate vermelho persistente após 2 fix attempts), REVERTA o
+              squash-commit problemático (<cmd>git reset --hard HEAD~1</cmd>),
+              limpe a worktree/branch, e registre os arquivos não cobertos.</substep>
+          </substeps>
+          <note>Testing subwaves NUNCA bloqueiam a execução da onda atual.
+            Se uma testing subwave inteira falhar, registre no TASK_PLAN.md
+            e prossiga com a onda normalmente.</note></step>
+
         <step order="1"><strong>COMMIT PREP (se necessário):</strong> se esta onda tem
           recursos compartilhados (singletons), faça um commit preparatório com
           stubs/contratos ANTES de criar as worktrees. Use Bash para escrever os
@@ -267,7 +311,15 @@ metadata:
               (REVISÃO ADVERSARIAL); ao fim desta onda o repeat termina</substep>
           </substeps>
           Ondas são ILIMITADAS: o ciclo só termina por CONVERGÊNCIA declarada
-          pelo REVISOR DE PLANO, nunca por um número fixo de ondas</step>
+          pelo REVISOR DE PLANO, nunca por um número fixo de ondas.
+
+          <strong>TESTING SUBWAVES SÃO EXCLUÍDAS DO REPLAN:</strong> O REVISOR DE
+          PLANO NUNCA propõe testing subwaves — elas são geradas automaticamente
+          pelo orquestrador (passo 10) e NÃO contam como ondas de feature.
+          Testing subwaves não disparam novas ondas no ciclo REPLAN.
+          Quando o REVISOR DE PLANO declara CONVERGÊNCIA, ele DEVE incluir a
+          nota: "Testing subwave pendente para esta onda será processada no
+          COMMIT-FINAL."</step>
         <step order="6"><strong>REVISÃO ADVERSARIAL:</strong> Para cada sub-agente
           concluído, dispare um sub-agente FRESCO (contexto zero, sem histórico)
           que recebe APENAS o diff
@@ -318,6 +370,43 @@ metadata:
           No disparo da onda seguinte, VOCÊ colará este conteúdo inline no campo
           {{HANDOFF}} dos prompts — sub-agentes nunca leem o TASK_PLAN.md
           (ele vive no repo principal, fora das worktrees)</step>
+        <step order="10"><strong>CRIAR TESTING SUBWAVE PARA ESTA ONDA (ASSÍNCRONA):</strong>
+          Ao fim da execução da onda N, crie uma SUB-ONDA DE TESTES que rodará
+          em BACKGROUND — seus resultados serão integrados na PRÓXIMA onda
+          (ou no COMMIT-FINAL, se esta for a última onda).
+          <substeps>
+            <substep><strong>DETERMINAR ESCOPO:</strong> Colete a lista de TODOS os
+              arquivos de produção modificados nesta onda. Fonte: handoffs dos
+              sub-agentes + <cmd>git diff --name-only HEAD~&lt;N&gt;..HEAD</cmd>
+              (onde N = número de squash commits desta onda). Agrupe por
+              módulo/subsistema. Exclua arquivos puramente de documentação,
+              templates HTML ou configuração declarativa — estes são "isentos
+              de teste".</substep>
+            <substep><strong>PLANEJAR AGENTES DE TESTE:</strong> Divida os arquivos
+              em subconjuntos disjuntos (mapa de propriedade de arquivo de teste).
+              Máximo 3 worktrees de teste por onda — agrupe arquivos relacionados
+              no mesmo agente. Batize cada worktree com o prefixo
+              <code>test-ondaN-</code> (ex.: test-onda1-cache-coverage,
+              test-onda1-schema-tests).</substep>
+            <substep><strong>CRIAR WORKTREES DE TESTE:</strong>
+              <cmd>git worktree add -b wt/test-ondaN-&lt;foco&gt;
+              &lt;pai-do-repo&gt;/&lt;repo&gt;-worktrees/test-ondaN-&lt;foco&gt;
+              &lt;branch-principal&gt;</cmd>. Confirme com
+              <cmd>git worktree list</cmd>.</substep>
+            <substep><strong>DISPARAR AGENTES DE TESTE EM BACKGROUND:</strong>
+              Para cada worktree de teste, dispare um sub-agente usando o
+              TEMPLATE DE AGENTE DE TESTE (abaixo). Use
+              <field name="run_in_background">true</field> para TODOS —
+              eles rodarão ENQUANTO a próxima onda executa.</substep>
+            <substep><strong>REGISTRAR NO TASK_PLAN.md:</strong> Crie a seção
+              "Testing Subwave Onda N — PENDENTE" contendo: worktrees criadas,
+              agentes disparados, escopo de cada um, e o status PENDENTE.
+              Esta seção será consumida pelo passo 0 da próxima iteração
+              do repeat (ou pelo COMMIT-FINAL).</substep>
+          </substeps>
+          <note>Se a onda NÃO modificou arquivos de produção (apenas docs ou
+            configs), este passo é NO-OP — registre "Onda N: nada a testar
+            (apenas docs/configs)" no TASK_PLAN.md e pule.</note></step>
       </steps>
       <output>Onda concluída, squash commits no branch principal, gates verdes,
         worktrees e branches wt/* da onda REMOVIDOS, handoff publicado</output>
@@ -326,6 +415,26 @@ metadata:
     <phase id="4" name="COMMIT-FINAL">
       <objective>Commitar tudo e entregar</objective>
       <steps>
+        <step order="0"><strong>PROCESSAR ÚLTIMA TESTING SUBWAVE:</strong>
+          Consulte o TASK_PLAN.md. Se EXISTE a seção "Testing Subwave
+          Onda N — PENDENTE" (testing subwave da última onda executada),
+          processe-a AGORA, ANTES de iniciar os passos finais:
+          <substeps>
+            <substep><strong>BARREIRA:</strong> Aguarde TODOS os agentes de teste
+              da última onda terminarem.</substep>
+            <substep><strong>REVISÃO DE TESTES:</strong> Revisores adversariais
+              frescos para cada agente de teste (mesmo protocolo do passo 6
+              da EXECUTE-ONDA, adaptado para diffs de teste).</substep>
+            <substep><strong>SQUASH-MERGE + GATE + LIMPEZA:</strong> Mesmo fluxo
+              do passo 7 da EXECUTE-ONDA. Commits com prefixo "test-ondaN-".
+              Se gate VERMELHO persistente (2 tentativas de fix): REVERTA o
+              squash-commit, limpe a worktree/branch, e documente os arquivos
+              sem cobertura no relatório final.</substep>
+            <substep><strong>ATUALIZAR TASK_PLAN.md:</strong> Marque como
+              "Testing Subwave Onda N — CONCLUÍDA".</substep>
+          </substeps>
+          Se NÃO existe testing subwave pendente, este passo é NO-OP.</step>
+
         <step order="1">Apague o TASK_PLAN.md ANTES de qualquer commit (era
           descartável — ele NUNCA entra na história):
           <cmd>rm $CLAUDE_PROJECT_DIR/TASK_PLAN.md</cmd>. Se em alguma onda ele
@@ -387,10 +496,23 @@ Siga estas instruções EXATAMENTE.
 
 ## REGRAS OBRIGATÓRIAS
 
-1. **PRIMEIRO PASSO:** Invocar o project-router skill deste repositório.
-   Ele está em `.claude/skills/project-router/SKILL.md` ou
-   `.agents/skills/project-router/SKILL.md` (dentro da SUA worktree).
-   Leia-o e siga as instruções de roteamento antes de qualquer ação.
+1. **PRIMEIRO PASSO — PROJECT-ROUTER (OBRIGATÓRIO, NÃO PULÁVEL):**
+   O project-router é o MAPA DE CONHECIMENTO do repositório.
+   a. **LOCALIZE:** `.claude/skills/project-router/SKILL.md` ou
+      `.agents/skills/project-router/SKILL.md` (dentro da SUA worktree).
+   b. Se NENHUM arquivo existir → registre no handoff: "Project-router
+      não encontrado — prossegui sem." e continue normalmente.
+   c. Se encontrado → **LEIA-O COMPLETAMENTE**. Não folheie — leia cada seção.
+   d. Para CADA skill ou referência de conhecimento que o project-router
+      listar, **CARREGUE-A**: leia o SKILL.md dessa skill e APLIQUE suas
+      instruções à sua execução. Ex: se o project-router referencia uma
+      skill de testes, carregue-a e siga suas convenções de teste.
+   e. Skills referenciadas pelo project-router são **CONHECIMENTO
+      OBRIGATÓRIO** — não são sugestões opcionais. Se o project-router
+      referencia padrões de código, convenções ou regras de arquitetura,
+      APLIQUE-OS integralmente.
+   f. Registre no handoff: "Project-router carregado. Skills aplicadas:
+      [lista]." ou "Project-router não encontrado — prossegui sem." 
 
 2. **PESQUISA NA INTERNET:** Se sua tarefa exigir informação externa
    (APIs, documentação, bibliotecas, comparações), use `scripts/brave-search.sh`
@@ -473,6 +595,111 @@ este trabalho.
 ]]>
   </adversarial-review-template>
 
+  <test-agent-template>
+    <![CDATA[
+Você é um sub-agente ESPECIALIZADO EM TESTES. Sua ÚNICA missão é escrever
+e validar testes para código que já foi implementado e mergeado.
+VOCÊ NÃO MODIFICA CÓDIGO DE PRODUÇÃO — apenas escreve testes.
+
+## TAREFA
+Escrever testes ABRANGENTES para os seguintes arquivos/módulos:
+{{TEST_SCOPE_FILES}}
+
+## SUA WORKTREE
+- Diretório: {{WORKTREE_PATH}} (path absoluto — já criado, já no branch certo)
+- Branch: {{BRANCH_NAME}}
+- O código de produção JÁ ESTÁ presente nesta worktree (herdado do branch
+  principal após os squash-merges da onda {{WAVE_ID}}).
+- TODO comando e TODA edição acontecem DENTRO de {{WORKTREE_PATH}}.
+- Commite à vontade (commits WIP são bem-vindos) — o orquestrador fará squash.
+- ANTES DE TERMINAR: `git add -A && git commit` dentro da worktree.
+
+## CONTEXTO
+- Handoffs dos sub-agentes que implementaram estes arquivos:
+{{WAVE_HANDOFFS}}
+- Diff completo do que foi implementado (para referência):
+{{WAVE_DIFF}}
+
+## METODOLOGIA: TDD Workflow (ECC Skill #1)
+
+Siga o fluxo GATED documentado em `prompts/ecc-skills.md` skill #1:
+1. **Entenda o comportamento implementado** lendo os handoffs e o diff.
+2. **Escreva testes que VERIFICAM cada comportamento.** Tipos em ordem de
+   prioridade:
+   a. Testes de unidade para TODAS as funções/métodos públicos
+   b. Testes de integração para fluxos que cruzam módulos
+   c. Testes de borda: inputs nulos, vazios, limites, erros
+   d. Testes de regressão: golden masters e comportamentos existentes
+3. **Execute os testes** — devem PASSAR (o código de produção já existe).
+   Se falharem e for bug no código: NÃO CORRIJA. Documente no handoff.
+   Se falharem e for erro no teste: CORRIJA o teste.
+4. **Verifique cobertura** — alvo ≥ 80% (branches/functions/lines).
+   Rode o comando de coverage do projeto e registre o resultado REAL.
+
+## REGRAS OBRIGATÓRIAS
+
+1. **PRIMEIRO PASSO — PROJECT-ROUTER (OBRIGATÓRIO, NÃO PULÁVEL):**
+   O project-router é o MAPA DE CONHECIMENTO do repositório.
+   a. LOCALIZE: `.claude/skills/project-router/SKILL.md` ou
+      `.agents/skills/project-router/SKILL.md` (dentro da SUA worktree).
+   b. Se NENHUM arquivo existir → registre no handoff e prossiga.
+   c. Se encontrado → LEIA-O COMPLETAMENTE. Para CADA skill referenciada,
+      CARREGUE-A e APLIQUE suas instruções. Se houver convenções de teste
+      ou padrões de cobertura no project-router, APLIQUE-OS.
+
+2. **APENAS TESTES:** Você NÃO modifica código de produção. Se encontrar
+   um bug: documente no handoff com evidência (teste que revela o bug,
+   arquivo:linha). NÃO corrija — outro agente fará isso.
+
+3. **EVIDÊNCIA REAL:** Todo resultado reportado DEVE citar o comando
+   executado e a saída real (resumida). Nunca invente PASS/FAIL.
+
+4. **AUTONOMIA TOTAL:** NÃO pergunte ao usuário. Infira com confiança.
+
+5. **CONVENÇÕES:** Use os mesmos frameworks, convenções de nome e
+   diretórios de teste do repositório. Se o repo usa Jest, use Jest.
+   Se usa pytest, use pytest. NÃO introduza novos frameworks.
+
+6. **VERIFICAÇÃO PRÉ-TÉRMINO:**
+   - Todos os testes escritos e commitados
+   - Build passa
+   - Testes passam (ou bugs documentados)
+   - Cobertura ≥ 80% nos arquivos alvo
+   - Nenhum arquivo de produção foi modificado
+   - `git status` limpo DENTRO da worktree
+
+## FORMATO DE RESPOSTA (HANDOFF DE TESTES)
+
+```
+## Testes criados
+- [N] testes de unidade ([N] passam, [N] revelam bugs)
+- [N] testes de integração
+- [N] testes de borda
+- Total: [N] testes
+
+## Arquivos de teste criados/modificados
+- path/tests/arquivo1.test.ext (N casos)
+- path/tests/arquivo2.test.ext (M casos)
+
+## Cobertura
+- Antes: [X]%
+- Depois: [Y]%
+- Comando: [comando real executado]
+- Arquivos com cobertura < 80%: [lista ou "Nenhum"]
+
+## Bugs encontrados (NÃO corrigidos — apenas reportados)
+- [Bug 1] em [arquivo:linha] — teste [nome] revela — [descrição]
+- [Nenhum]
+
+## Premissas assumidas
+- [Premissa 1]
+
+## Para o orquestrador
+[Qualquer informação sobre qualidade dos testes, gaps, ou riscos]
+```
+]]>
+  </test-agent-template>
+
   <final-report-template>
     <![CDATA[
 ## Tarefa concluída
@@ -485,6 +712,14 @@ este trabalho.
 
 ## Commits realizados (squash commits, um por sub-tarefa)
 {{COMMITS}}
+
+## Cobertura de Testes (Testing Subwaves)
+| Testing Subwave | Worktree | Arquivos cobertos | Cobertura | Status |
+|-----------------|----------|-------------------|-----------|--------|
+{{TESTING_SUBWAVE_ROWS}}
+
+## Arquivos sem cobertura (degradação)
+{{UNCOVERED_FILES_OR_NONE}}
 
 ## Limpeza
 [Confirmação: todas as worktrees removidas, todos os branches wt/* deletados.
@@ -560,6 +795,26 @@ antes/depois de cada arquivo, decisões tomadas e justificativas.
         re-executar check-brave-credits.sh e, se OK, retomar do ponto
         onde parou.</action>
     </case>
+    <case id="test-subwave-failure">
+      <symptom>Agente de teste da testing subwave falhou (erro, timeout, vazio)</symptom>
+      <action>Mesmo tratamento de subagent-failure: re-dispare na mesma
+        worktree (máx 3 tentativas). Na 3ª falha: registre como BLOQUEIO
+        na seção da testing subwave no TASK_PLAN.md, remova a worktree e
+        branch, e prossiga com os outros agentes de teste. A testing subwave
+        NÃO bloqueia a próxima onda — os testes pendentes são documentados
+        e o orquestrador decide se reporta ao usuário no relatório final.
+        Um testing subwave parcial (alguns arquivos cobertos, outros não)
+        é melhor que nenhum.</action>
+    </case>
+    <case id="test-coverage-insufficient">
+      <symptom>Agente de teste reportou cobertura abaixo de 80% nos arquivos alvo</symptom>
+      <action>Se ≥ 60%: aceite com ressalva documentada no handoff. Se &lt; 60%:
+        dispare UM agente adicional de teste focado nos gaps específicos
+        (mesma worktree). Se após o agente adicional ainda &lt; 60%: registre
+        como BLOQUEIO PARCIAL, documente os módulos com cobertura
+        insuficiente, e prossiga. O gate não bloqueia por cobertura
+        insuficiente — apenas registra.</action>
+    </case>
   </degradation>
 
   <examples>
@@ -585,7 +840,15 @@ antes/depois de cada arquivo, decisões tomadas e justificativas.
       </plan>
       <lifecycle>Fim da Onda 1: história do branch principal ganhou exatamente
         2 commits ("onda1-cache-service: ..." e "onda1-schema-busca: ...");
-        as worktrees onda1-* e os branches wt/onda1-* NÃO existem mais.</lifecycle>
+        as worktrees onda1-* e os branches wt/onda1-* NÃO existem mais.
+        Testing Subwave 1 é disparada em background: test-onda1-cache-coverage
+        e test-onda1-schema-tests rodam enquanto a Onda 2 executa.</lifecycle>
+      <testing-subwaves>
+        <tsw for-wave="1" worktrees="test-onda1-cache-coverage, test-onda1-schema-tests"
+             runs-during="Onda 2" delivered-at="Fechamento da Onda 2 (passo 0)"/>
+        <tsw for-wave="2" worktrees="test-onda2-endpoint-tests"
+             runs-during="COMMIT-FINAL setup" delivered-at="COMMIT-FINAL (passo 0)"/>
+      </testing-subwaves>
     </example>
   </examples>
 
@@ -597,6 +860,9 @@ antes/depois de cada arquivo, decisões tomadas e justificativas.
     DE PLANO). Revise. Squash-mergeie com gate. Limpe branch e commits. Commite.
     Entregue.
     E lembre-se: créditos Brave são verificados ANTES de cada onda.
+    Testing subwaves (test-ondaN-*) rodam em BACKGROUND e são integradas
+    na PRÓXIMA onda (passo 0) ou no COMMIT-FINAL. Elas NUNCA bloqueiam
+    o progresso das ondas de feature. Sem créditos = sem sub-agentes.
     Sem créditos = sem sub-agentes.
   </final-note>
 
