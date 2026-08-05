@@ -1,17 +1,49 @@
-# deep-orchestrator v3.0.0
+# deep-orchestrator v3.2.0
 
-![Versão](https://img.shields.io/badge/version-3.0.0-00d4ff)
+![Versão](https://img.shields.io/badge/version-3.2.0-00d4ff)
 
 Orquestrador autônomo multi-agente para Claude Code — planeja, divide em ondas **ILIMITADAS** (com recálculo dinâmico), cria worktrees isoladas, delega, revisa adversarialmente, integra via squash-merge com gate, verifica créditos Brave antes de cada onda, e commita tudo ao final **sem perguntar nada ao usuário**.
+
+## Glossário (leia antes do resto)
+
+| Termo | O que é |
+|-------|---------|
+| **`$SKILL_HOME`** | A **casa da skill**: `scripts/`, `prompts/`, `templates/`. Fica fora do projeto-alvo e é **somente leitura/execução** durante uma execução. Caminhos escritos como `$SKILL_HOME/...` são daqui; caminhos sem prefixo são do repositório-alvo. |
+| **RAIZ-DE-MUNDO (`$BASE_DIR`)** | `git rev-parse --show-toplevel` no diretório de invocação. Se você invocou dentro de uma git worktree vinculada, é a **worktree** — não o projeto principal. É a fronteira de escrita. |
+| **`$BASE_BRANCH`** | O branch em HEAD na raiz-de-mundo. É o **único** alvo de integração. Nunca é resolvido por convenção (main/master). |
+| **`$MAIN_ROOT`** | O checkout principal do repositório. Em MODO CONTIDO é **zona proibida**. |
+| **WORKTREE-FILHA** | Uma worktree por sub-agente, criada sob `$CHILD_ROOT`, com branch `$BRANCH_NS/<nome>`. |
+
+## MODO CONTIDO
+
+Se a skill for invocada com o cwd **dentro de uma git worktree vinculada**, ela entra em MODO CONTIDO e trata essa worktree como raiz-de-mundo:
+
+- os squash-commits vão para o **branch da worktree**, jamais para `main`/`master`;
+- nenhum arquivo é escrito no projeto principal — `do-wt.sh verify` confere ao fim de cada onda o HEAD, a working tree (incluindo arquivos ignorados, para pegar um `node_modules/` nascendo lá) e o config local contra o baseline da FASE 0. A prova é de **autoria**, não de imutabilidade: se o principal mudou mas nenhum commit desta execução é alcançável a partir do HEAD dele, é ALERTA (você trabalhando em paralelo), não violação;
+- as worktrees-filhas nascem num **container irmão oculto** `<pai>/.<worktree>-do/<RUN_ID>/` (fallback automático para `<worktree>/.deep-orchestrator/worktrees/` quando o irmão cairia dentro de outro repositório git; force com `DO_FORCE_NESTED=1`);
+- os branches vivem num namespace exclusivo por execução (`do/<slug>/<RUN_ID>/<nome>`), então duas orquestrações simultâneas não se apagam;
+- a limpeza usa **allowlist** (`owned.tsv` + lock nativo do git), nunca varredura: `git worktree list` e `git branch --list` enxergam worktrees de outras sessões, e `git worktree prune` é proibido;
+- a sujeira que já existia na worktree antes da execução é **do usuário** e nunca entra nos commits (`do-wt.sh stage-delta`).
+
+O único vestígio compartilhado aceito é o registro administrativo das filhas em `$GIT_COMMON_DIR/worktrees/`, que o próprio git cria e é inevitável.
+
+Em MODO NORMAL (invocação na árvore principal) valem as mesmas invariantes, com `$CHILD_ROOT` em `<pai>/<repo>-worktrees/<RUN_ID>/`.
+
+## Novidades na v3.2.0
+
+- **MODO CONTIDO** (acima) + **FASE 0 — DELIMITAR O MUNDO**: `scripts/do-context.sh` detecta worktree vinculada, resolve a fronteira e grava o arquivo de estado que toda chamada Bash sourceia.
+- **Guardas em código, não em prosa**: `scripts/do-wt.sh` concentra criação, merge, undo, remoção, limpeza e prova de contenção. Cada operação destrutiva recusa alvos que não estejam registrados nesta execução.
+- **Regra de dependências (R9)**: instalação permitida se necessária, sempre com cwd na worktree-filha, em modo congelado e com `HUSKY=0` (um postinstall de husky grava `core.hooksPath` no `.git` compartilhado). Cache global do usuário é permitido; escopo global de instalação é proibido.
+- **Testes de regressão**: `scripts/test-contencao.sh` — 50 asserções cobrindo detecção de modo, colocação, limpeza segura, worktrees de terceiros, preservação da sujeira do usuário, paths com acento e espaço, guarda de índice sujo e distinção entre vazamento nosso e trabalho do usuário no projeto principal.
 
 ## Novidades na v3.0.0
 
 - **Ondas ilimitadas** com recálculo dinâmico — após cada onda, um sub-agente REVISOR DE PLANO analisa os handoffs e o TASK_PLAN.md, propõe novas sub-tarefas ou declara CONVERGÊNCIA. O ciclo só termina por convergência declarada, nunca por um número fixo de ondas.
-- **Busca interna Brave** (`scripts/brave-search.sh`) — CLI próprio sobre a Brave Search API que substitui o `surf-search-normal`; não depende mais do `surf-research-skill` nem do CLI `surf-ai`.
-- **Verificação de créditos** antes de cada onda (`scripts/check-brave-credits.sh`) — sem créditos, o orquestrador para e informa o usuário (única exceção à autonomia total).
-- **ECC Prompts integrados** — 7 templates de prompt (`prompts/ecc-prompts.md`) + 7 skills portados do ECC (`prompts/ecc-skills.md`), incluindo Security Review (AgentShield), Planning Prompt (Plan First) e Prompt Defense Baseline.
-- **Prompts de busca para dev** (`prompts/search-prompts.md`) — 8 categorias de busca, sistema de evolução de perguntas (question evolution) e prompts por domínio.
-- **HTML Explainer** automático ao final de cada execução (`templates/html-explainer.html`) — de-para de todas as mudanças em 6 abas, salvo como `EXPLAINER.html` na raiz do repositório.
+- **Busca interna Brave** (`$SKILL_HOME/scripts/brave-search.sh`) — CLI próprio sobre a Brave Search API que substitui o `surf-search-normal`; não depende mais do `surf-research-skill` nem do CLI `surf-ai`.
+- **Verificação de créditos** antes de cada onda (`$SKILL_HOME/scripts/check-brave-credits.sh`) — sem créditos, o orquestrador para e informa o usuário (única exceção à autonomia total).
+- **ECC Prompts integrados** — 7 templates de prompt (`$SKILL_HOME/prompts/ecc-prompts.md`) + 7 skills portados do ECC (`$SKILL_HOME/prompts/ecc-skills.md`), incluindo Security Review (AgentShield), Planning Prompt (Plan First) e Prompt Defense Baseline.
+- **Prompts de busca para dev** (`$SKILL_HOME/prompts/search-prompts.md`) — 8 categorias de busca, sistema de evolução de perguntas (question evolution) e prompts por domínio.
+- **HTML Explainer** automático ao final de cada execução (`$SKILL_HOME/templates/html-explainer.html`) — de-para de todas as mudanças em 6 abas, salvo como `EXPLAINER.html` na raiz da worktree em que a skill foi invocada.
 
 ## Como funciona
 
@@ -25,28 +57,34 @@ ANALYZE  →  PLAN  →  EXECUTE-ONDA (repeat, ILIMITADO)  →  COMMIT-FINAL
 
 | Fase | Nome | O que faz |
 |------|------|-----------|
-| 1 | **ANALYZE** | Lê o prompt, mapeia a estrutura do repositório, identifica subsistemas, classifica greenfield/brownfield, localiza golden masters, verifica que `BRAVE_API_KEY` está definida e que há créditos (`scripts/check-brave-credits.sh --fail-fast`) |
+| 0 | **DELIMITAR O MUNDO** | Roda `$SKILL_HOME/scripts/do-context.sh`: detecta se o cwd está numa worktree vinculada, resolve `$BASE_DIR`, `$BASE_BRANCH`, `$MAIN_ROOT`, `$CHILD_ROOT`, `$BRANCH_NS` e `$SKILL_HOME`, e captura os baselines de contenção. Aborta com mensagem acionável se não houver branch de integração |
+| 1 | **ANALYZE** | Lê o prompt, mapeia a estrutura do repositório, identifica subsistemas, classifica greenfield/brownfield, localiza golden masters, verifica que `BRAVE_API_KEY` está definida e que há créditos (`$SKILL_HOME/scripts/check-brave-credits.sh --fail-fast`) |
 | 2 | **PLAN** | Decompõe a tarefa em sub-tarefas atômicas, identifica o grafo de dependências, organiza em ondas topológicas (número NÃO fixo — o plano é um ponto de partida), define o mapa de propriedade de arquivos, batiza cada worktree, escreve os prompts de delegação, publica o TASK_PLAN.md |
-| 3 | **EXECUTE-ONDA** | Para cada onda: verificação de créditos → commit prep (se necessário) → cria worktrees → dispara agentes em paralelo → barreira → **recálculo dinâmico (REVISOR DE PLANO)** → revisão adversarial → squash-merge um a um com gate → limpeza de worktrees/branches → handoff para a próxima onda. Repete até o REVISOR DE PLANO declarar CONVERGÊNCIA |
-| 4 | **COMMIT-FINAL** | Remove o TASK_PLAN.md, roda o gate completo, commita os arquivos restantes, varredura final de limpeza, **gera o EXPLAINER.html** (a partir do template `templates/html-explainer.html`) e produz o relatório final |
+| 3 | **EXECUTE-ONDA** | Para cada onda: verificação de créditos → commit prep (se necessário) → cria worktrees → dispara agentes em paralelo → barreira → **recálculo dinâmico (REVISOR DE PLANO)** → revisão adversarial → squash-merge um a um com gate → remoção APENAS das worktrees-filhas e branches desta execução, por nome registrado → prova de contenção → handoff para a próxima onda. Repete até o REVISOR DE PLANO declarar CONVERGÊNCIA |
+| 4 | **COMMIT-FINAL** | Remove o TASK_PLAN.md, roda o gate completo, commita **apenas o que esta execução produziu** (a sujeira preexistente do usuário é preservada), varredura final restrita à lista nominal registrada, **gera o EXPLAINER.html** (a partir do template `$SKILL_HOME/templates/html-explainer.html`) e produz o relatório final |
 
 ### Regras fundamentais
 
 1. **Nunca escreve código** — delega tudo a sub-agentes
-2. **Nunca pergunta ao usuário** — autonomia total, infere com confiança (única exceção: falta de créditos Brave ou `BRAVE_API_KEY` ausente)
+2. **Nunca pergunta ao usuário** — autonomia total, infere com confiança. Três exceções, e apenas estas: `BRAVE_API_KEY` ausente, créditos Brave esgotados, ou abort da FASE 0 (não é repositório, HEAD destacado, repo sem commits, índice sujo)
 3. **Trabalho completo, do início ao commit** — nunca entrega trabalho parcial
 4. **Worktree é a unidade de isolamento** — cada sub-agente trabalha em sua própria worktree Git com nome descritivo (ex.: `onda1-cache-service`)
-5. **Squash-merge um a um, nunca octopus** — integração sequencial com gate entre merges
-6. **Worktree nasce nomeada e morre no fim da própria onda** — limpeza imediata após gate verde
-7. **Verificar créditos Brave antes de cada onda** — `scripts/check-brave-credits.sh --fail-fast`; sem créditos, nenhuma worktree é criada e nenhum sub-agente é disparado
+5. **Squash-merge um a um, nunca octopus** — integração sequencial em `$BASE_BRANCH`, com gate entre merges
+6. **Worktree nasce nomeada e morre no fim da própria onda** — limpeza imediata após gate verde, sempre por nome registrado
+7. **Verificar créditos Brave antes de cada onda** — `$SKILL_HOME/scripts/check-brave-credits.sh --fail-fast`; sem créditos, nenhuma worktree é criada e nenhum sub-agente é disparado
+8. **A worktree de invocação é a raiz-de-mundo** — nada é escrito fora dela; o branch dela é o único alvo de integração; a limpeza só toca o que esta execução registrou
+9. **Dependências: dentro da worktree, congeladas, nunca globais** — instale só se necessário, com cwd na filha e `HUSKY=0`; cache global do usuário é permitido
 
-## Estrutura do repositório
+## Estrutura da casa da skill (`$SKILL_HOME`)
 
 ```
 deep-orchestrator/
 ├── README.md                    # Este arquivo
-├── SKILL.md                     # Definição do skill v3.0.0 (frontmatter YAML + XML do orquestrador)
+├── SKILL.md                     # Definição do skill v3.2.0 (frontmatter YAML + XML do orquestrador)
 ├── scripts/
+│   ├── do-context.sh            # FASE 0 — delimita a raiz-de-mundo e grava o estado
+│   ├── do-wt.sh                 # ciclo de vida das worktrees-filhas (guardas de contenção)
+│   ├── test-contencao.sh        # testes de regressão do MODO CONTIDO
 │   ├── brave-search.sh          # CLI de busca Brave (substitui o surf-search-normal)
 │   └── check-brave-credits.sh   # Verificador de créditos da Brave Search API
 ├── prompts/
@@ -63,7 +101,11 @@ deep-orchestrator/
 - Git
 - **Brave Search API key** — `export BRAVE_API_KEY=<chave>` (https://api.search.brave.com/app/keys); o plano gratuito inclui ~$5/mês de créditos
 - `curl` e `jq` (usados pelos scripts de busca)
-- `project-router` skill no repositório-alvo (roteamento de subsistemas)
+- `project-router` skill resolvido a partir da raiz-de-mundo (`<raiz>/.claude/skills/project-router/` ou `<raiz>/.agents/skills/project-router/`). Ausente, o sub-agente registra no handoff e segue — não cai para o repositório principal nem para `~/.claude`
+
+### Dependências
+
+Uma worktree recém-criada **não** herda `node_modules`, `.venv` ou `target`: são untracked e `git worktree add` não os copia. Se a sub-tarefa precisar deles, o sub-agente instala **dentro da worktree** (cwd na raiz da filha), em modo congelado (`npm ci`, `pnpm install --frozen-lockfile`, `uv sync --frozen`, …), com `HUSKY=0`, nunca com flags globais e nunca no projeto principal. O cache global do usuário (`~/.npm`, `~/.cache/uv`, `~/.cargo`, `~/.m2`) é permitido e desejável: é conteúdo endereçado por hash, compartilhado pela máquina, e redirecioná-lo só forçaria re-download por agente.
 
 ## Instalação
 
@@ -75,6 +117,10 @@ git clone <repo-url> ~/Projects/deep-orchestrator
 # pois scripts/, prompts/ e templates/ são referenciados pelo SKILL.md
 mkdir -p .claude/skills/deep-orchestrator
 cp -r SKILL.md scripts prompts templates .claude/skills/deep-orchestrator/
+
+# Este bloco é setup MANUAL do usuário, executado UMA VEZ, fora de qualquer
+# execução da skill — NUNCA por um sub-agente. A skill não se auto-instala no
+# repositório-alvo: ela é lida de $SKILL_HOME.
 
 # Defina a chave da Brave Search API
 export BRAVE_API_KEY=<chave>
@@ -117,9 +163,13 @@ O orquestrador vai:
 3. Executar cada onda com barreira, recálculo dinâmico (REVISOR DE PLANO), revisão adversarial, squash-merge com gate e limpeza — ondas adicionais podem surgir se o revisor detectar novas sub-tarefas
 4. Commitar tudo, gerar o `EXPLAINER.html` e entregar o relatório
 
-Ao final, o histórico do branch principal terá exatamente 3 commits squash (um por sub-agente), zero worktrees remanescentes e zero branches `wt/*`.
+Ao final, o histórico do **branch da raiz-de-mundo** (o branch da worktree em que a skill foi invocada; `main`/`master` apenas quando a invocação foi na árvore principal) terá 3 commits squash de feature — um por sub-agente —, mais um commit por testing subwave integrada (`test-onda1-*`, `test-onda2-*`) e o commit final com o `EXPLAINER.html`. Nenhuma worktree-filha nem branch desta execução sobra; worktrees e branches pré-existentes de outras sessões não são tocados.
 
 ## Versão
+
+**3.2.0** — MODO CONTIDO (worktree como raiz-de-mundo), FASE 0 de bootstrap, guardas de contenção em `do-wt.sh`, regra de dependências (R9), testes de regressão.
+
+**3.1.0** — Testing subwaves assíncronas, enforcement do project-router.
 
 **3.0.0** — Brave Search interno, ondas ilimitadas, ECC prompts, verificação de créditos, HTML explainer.
 
