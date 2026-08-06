@@ -8,12 +8,12 @@ description: >-
   worktree + branch + commits intermediários ao fim de cada onda, e commita tudo
   ao final sem perguntar nada ao usuário. Inclui TESTING SUBWAVES assíncronas
   (test-ondaN-*) que rodam em background após cada onda e têm seus resultados
-  integrados na onda seguinte (ou no COMMIT-FINAL para a última onda). Pesquisa web via Brave Search API INTERNA
-  (scripts/brave-search.sh), com verificação de créditos antes de cada onda
-  (scripts/check-brave-credits.sh) e templates de prompt avançados ECC
+  integrados na onda seguinte (ou no COMMIT-FINAL para a última onda). Pesquisa web via sistema de busca 3-tier INTERNO
+  (scripts/search.sh: surf-skill → Brave Search API → DuckDuckGo keyless), com verificação de tiers antes de cada onda
+  (scripts/check-search-credits.sh) e templates de prompt avançados ECC
   (prompts/ecc-prompts.md) — todos resolvidos a partir de $SKILL_HOME, a casa da
   skill, que é somente leitura. Cada sub-agente invoca o project-router
-  do repositório e usa brave-search.sh para pesquisa.
+  do repositório e usa search.sh para pesquisa.
   MODO CONTIDO: quando invocado com o cwd dentro de uma git worktree vinculada,
   trata ESSA worktree como RAIZ-DE-MUNDO — integra no branch dela (nunca
   main/master), cria as filhas em container próprio, jamais escreve no projeto
@@ -59,7 +59,7 @@ effort: xhigh
 metadata:
   version: "3.2.0"
   created: "2026-08-02"
-  updated: "2026-08-04"
+  updated: "2026-08-06"
   skill-home: "~/Projects/deep-orchestrator"   # casa da skill (scripts/, prompts/, templates/) — NÃO é o projeto-alvo
   based-on: "playbook-modernizar-legado-agentes-paralelos"
 ---
@@ -94,9 +94,12 @@ metadata:
       <title>NUNCA pergunte ao usuário</title>
       <body>Autonomia total. Se falta informação, INFIRA com confiança e documente
         a premissa. Se há ambiguidade, ESCOLHA o caminho mais razoável.
-        TRÊS exceções, e apenas estas: (a) $BRAVE_API_KEY não está definida;
-        (b) $SKILL_HOME/scripts/check-brave-credits.sh retorna != 0 (sem
-        créditos Brave, nenhum sub-agente pode pesquisar — ver R7); (c) a FASE 0
+        TRÊS exceções, e apenas estas: (a) $BRAVE_API_KEY não está definida E
+        a tarefa EXIGE pesquisa de alta qualidade (dados estruturados, APIs
+        específicas) — apenas Tier 3 (DDG keyless) não basta;
+        (b) $SKILL_HOME/scripts/check-search-credits.sh retorna exit 2 (todos
+        os tiers de busca indisponíveis, nenhum sub-agente pode pesquisar — ver
+        R7); (c) a FASE 0
         aborta (não é repositório, HEAD destacado, repo sem commits, índice
         sujo) — repasse a mensagem acionável e aguarde, porque sem fronteira
         definida não há execução segura (ver R8). Em qualquer uma delas, informe
@@ -158,16 +161,30 @@ metadata:
         seu backup para investigação e re-merge.</body>
     </rule>
     <rule id="R7" severity="FATAL">
-      <title>Verificar créditos Brave ANTES de disparar ondas</title>
+      <title>Verificar sistema de busca 3-tier ANTES de disparar ondas</title>
       <body>Antes de criar worktrees para QUALQUER onda, execute
-        "$SKILL_HOME/scripts/check-brave-credits.sh" --fail-fast. Se exit != 0:
-        PARE TUDO. Não crie worktrees. Não dispare sub-agentes.
-        Informe o usuário: "BRAVE_API_KEY sem créditos. Adicione
-        créditos em https://api.search.brave.com/app/plans e
-        avise quando estiver pronto." Aguarde o usuário responder.
-        NENHUM sub-agente deve ser disparado sem créditos.
-        ATENÇÃO: script ausente ou não-executável NÃO é "sem créditos" —
-        registre no TASK_PLAN.md e siga SEM pesquisa web; não dispare R7.</body>
+        "$SKILL_HOME/scripts/check-search-credits.sh" --fail-fast. O sistema de
+        busca tem 3 tiers:
+        <strong>Tier 1:</strong> surf-skill (surf-search-normal) — multi-provider
+        AI-powered (Tavily + Parallel + Brave + DDG + Wikipedia) com AI planner.
+        <strong>Tier 2:</strong> Brave Search API direta — via função
+        search_brave_api() sourceada do brave-search.sh.
+        <strong>Tier 3:</strong> DuckDuckGo Instant Answer API — keyless, sempre
+        disponível, fallback final de qualidade reduzida.
+        O script check-search-credits.sh testa os tiers em cascata. Ação por
+        exit code:
+        • Exit 0 — Tier 1 ou 2 disponível: pesquisa completa. OK, prosseguir.
+        • Exit 1 — apenas Tier 3 (keyless): qualidade reduzida, mas funciona.
+          REGISTRE no TASK_PLAN.md: "Pesquisa em modo degradado — apenas DDG
+          keyless." e prossiga normalmente.
+        • Exit 2 — nada disponível: PARE TUDO. Não crie worktrees. Não dispare
+          sub-agentes. Informe o usuário: "Sistema de busca indisponível —
+          verifique conectividade e configuração da BRAVE_API_KEY." Aguarde o
+          usuário responder. NENHUM sub-agente deve ser disparado sem
+          capacidade de pesquisa.
+        ATENÇÃO: script ausente ou não-executável NÃO é "sem busca" —
+        registre no TASK_PLAN.md e prossiga com fallback direto (search.sh
+        usará Tier 3 DDG keyless automaticamente); não dispare R7.</body>
     </rule>
     <rule id="R8" severity="FATAL">
       <title>RAIZ-DE-MUNDO: a worktree onde você foi invocado é a fronteira</title>
@@ -359,15 +376,20 @@ metadata:
           diretório das filhas é <strong>$CHILD_ROOT</strong>. Apenas confirme
           e registre no TASK_PLAN.md</step>
         <step order="7">Verifique que $BRAVE_API_KEY está definida
-          (<cmd>printenv BRAVE_API_KEY</cmd>). Se ausente, informe o usuário:
-          "BRAVE_API_KEY não está definida. Defina-a com uma chave da Brave
-          Search API (https://api.search.brave.com/app/keys) e avise quando
-          estiver pronto." — e AGUARDE a resposta (exceção da R2)</step>
-        <step order="8">Verifique créditos ANTES de qualquer execução:
-          <cmd>if [ -x "$SKILL_HOME/scripts/check-brave-credits.sh" ]; then "$SKILL_HOME/scripts/check-brave-credits.sh" --fail-fast || echo "R7: sem créditos"; else echo "AVISO: script ausente — seguir SEM pesquisa web"; fi</cmd>
-          Se o script existe e retorna != 0: siga R7 (PARE TUDO, informe o
-          usuário, aguarde). Se o script está AUSENTE, isso NÃO é R7 —
-          registre e siga sem pesquisa web</step>
+          (<cmd>printenv BRAVE_API_KEY</cmd>). Se ausente, REGISTRE no
+          TASK_PLAN.md: "BRAVE_API_KEY não definida — apenas Tier 3 (DDG
+          keyless) disponível para pesquisa." e prossiga normalmente.
+          Tier 3 (DDG) funciona sem chave — a pesquisa fica degradada mas
+          operacional. Se a tarefa EXIGE pesquisa de alta qualidade (dados
+          estruturados, APIs específicas), informe o usuário e AGUARDE a
+          resposta (exceção da R2).</step>
+        <step order="8">Verifique o sistema de busca ANTES de qualquer execução:
+          <cmd>if [ -x "$SKILL_HOME/scripts/check-search-credits.sh" ]; then "$SKILL_HOME/scripts/check-search-credits.sh" --fail-fast; case $? in 0) ;; 1) echo "AVISO: apenas Tier 3 (DDG keyless) — qualidade reduzida";; 2) echo "R7: busca indisponivel";; esac; else echo "AVISO: script ausente — prosseguir com fallback direto (search.sh usará Tier 3 DDG keyless automaticamente)"; fi</cmd>
+          Se o script existe e retorna exit 2: siga R7 (PARE TUDO, informe o
+          usuário, aguarde). Se retorna exit 1: apenas Tier 3 (DDG keyless),
+          registre no TASK_PLAN.md e prossiga com qualidade reduzida. Se o
+          script está AUSENTE, isso NÃO é R7 — registre e siga sem pesquisa
+          web</step>
       </steps>
       <output>Compreensão completa do escopo, subsistemas afetados, e o que NÃO pode quebrar</output>
     </phase>
@@ -468,11 +490,14 @@ metadata:
             Se uma testing subwave inteira falhar, registre no TASK_PLAN.md
             e prossiga com a onda normalmente.</note></step>
 
-        <step order="0.5"><strong>CRÉDITOS (R7) — antes de criar qualquer
+        <step order="0.5"><strong>SISTEMA DE BUSCA (R7) — antes de criar qualquer
           worktree desta onda:</strong>
-          <cmd>. '&lt;ENV_FILE&gt;'; if [ -x "$SKILL_HOME/scripts/check-brave-credits.sh" ]; then "$SKILL_HOME/scripts/check-brave-credits.sh" --fail-fast || echo "R7: sem creditos"; else echo "AVISO: script ausente — seguir SEM pesquisa web"; fi</cmd>
-          Sem créditos: PARE, informe o usuário, aguarde (R7). Script ausente
-          NÃO é R7 — registre e siga sem pesquisa web</step>
+          <cmd>. '&lt;ENV_FILE&gt;'; if [ -x "$SKILL_HOME/scripts/check-search-credits.sh" ]; then "$SKILL_HOME/scripts/check-search-credits.sh" --fail-fast; case $? in 0) ;; 1) echo "AVISO: apenas Tier 3 (DDG keyless) — qualidade reduzida";; 2) echo "R7: busca indisponivel";; esac; else echo "AVISO: script ausente — prosseguir com fallback direto (search.sh usará Tier 3 DDG keyless automaticamente)"; fi</cmd>
+          Exit 0: Tier 1 ou 2 disponível — OK, prosseguir.
+          Exit 1: apenas Tier 3 (DDG keyless) — registrar no TASK_PLAN.md e
+          prosseguir com qualidade reduzida.
+          Exit 2: nada disponível — PARE, informe o usuário, aguarde (R7).
+          Script ausente NÃO é R7 — registre e siga sem pesquisa web</step>
         <step order="1"><strong>COMMIT PREP (se necessário):</strong> se esta onda tem
           recursos compartilhados (singletons), faça um commit preparatório com
           stubs/contratos ANTES de criar as worktrees. Escreva os stubs via Bash
@@ -803,15 +828,21 @@ Siga estas instruções EXATAMENTE.
 
 2. **PESQUISA NA INTERNET:** Se sua tarefa exigir informação externa
    (APIs, documentação, bibliotecas, comparações), use
-   `{{SKILL_HOME}}/scripts/brave-search.sh` (path absoluto, já resolvido pelo
-   orquestrador). Parâmetros: --task, --goal, --insights, --deliverable,
-   --json, --dev-mode, --max-evolutions N. NUNCA invente fatos, URLs ou APIs.
+   `{{SKILL_HOME}}/scripts/search.sh` (path absoluto, já resolvido pelo
+   orquestrador) — a interface UNIFICADA de busca do deep-orchestrator.
+   Parâmetros: --task, --goal, --insights, --deliverable, --brief-file,
+   --count, --json, --dev-mode, --max-evolutions N.
+   O script implementa fallback automático em 3 tiers:
+   <strong>Tier 1:</strong> surf-skill (multi-provider AI-powered) →
+   <strong>Tier 2:</strong> Brave Search API direta →
+   <strong>Tier 3:</strong> DuckDuckGo Instant Answer (keyless, sempre
+   funciona). NUNCA invente fatos, URLs ou APIs.
    {{SKILL_HOME}} fica FORA da sua worktree: você pode INVOCAR o script, mas
    NÃO pode escrever nada lá nem fazer `cd` para dentro. Se {{SKILL_HOME}} vier
    vazio, registre no handoff e prossiga sem pesquisa — NÃO saia da sua worktree
    para procurar o script.
-   Créditos Brave: NÃO verifique — o orquestrador já os verificou antes de
-   disparar esta onda.
+   Estado da busca: NÃO verifique — o orquestrador já verificou os tiers
+   disponíveis antes de disparar esta onda.
 
 3. **ECC PROMPTS:** Consulte `{{SKILL_HOME}}/prompts/ecc-prompts.md` (somente
    leitura) para templates de prompt avançados. Para tarefas de segurança, use o
@@ -1171,13 +1202,16 @@ justificativas.
         diretório esteja momentaneamente ausente. Registro órfão remanescente é
         inofensivo: anote no relatório.</action>
     </case>
-    <case id="brave-credits-expired">
-      <symptom>check-brave-credits.sh --fail-fast retornou exit != 0</symptom>
+    <case id="search-credits-expired">
+      <symptom>check-search-credits.sh --fail-fast retornou exit 2 (nenhum tier disponível)</symptom>
       <action>NÃO criar worktrees. NÃO disparar sub-agentes. Informar o
-        usuário: créditos insuficientes na Brave Search API. Aguardar
-        resposta do usuário. Se o usuário disser que adicionou créditos,
-        re-executar check-brave-credits.sh e, se OK, retomar do ponto
-        onde parou.</action>
+        usuário: sistema de busca completamente indisponível — verifique
+        conectividade e configuração da BRAVE_API_KEY. Aguardar
+        resposta do usuário. Se o usuário disser que resolveu,
+        re-executar check-search-credits.sh e, se OK, retomar do ponto
+        onde parou. Se retornou exit 1 (apenas Tier 3 keyless), NÃO é
+        este caso — é degradação aceitável, registre no TASK_PLAN.md e
+        prossiga.</action>
     </case>
     <case id="test-subwave-failure">
       <symptom>Agente de teste da testing subwave falhou (erro, timeout, vazio)</symptom>
@@ -1206,7 +1240,7 @@ justificativas.
       <plan>
         <wave id="1" name="Fundação">
           <agent id="1.1" worktree="onda1-cache-service" branch="$BRANCH_NS/onda1-cache-service" files="src/cache/">
-            Pesquisar ({{SKILL_HOME}}/scripts/brave-search.sh) as 3 melhores libraries
+            Pesquisar ({{SKILL_HOME}}/scripts/search.sh) as 3 melhores libraries
             de cache para a linguagem do projeto. Escolher uma. Instalar a dependência
             DENTRO da worktree (cwd na filha, modo congelado, HUSKY=0 — R9). Criar
             src/cache/CacheService com interface genérica.
@@ -1252,11 +1286,12 @@ justificativas.
     Batize a worktree. Delegue. Espere a barreira. Recalcule o plano (REVISOR
     DE PLANO). Revise. Squash-mergeie com gate. Limpe branch e commits. Commite.
     Entregue.
-    E lembre-se: créditos Brave são verificados ANTES de cada onda.
+    E lembre-se: o sistema de busca 3-tier (surf-skill → Brave → DDG keyless) é
+    verificado ANTES de cada onda via check-search-credits.sh. O Tier 3 (DDG
+    keyless) sempre funciona — qualidade reduzida mas sem bloqueio.
     Testing subwaves (test-ondaN-*) rodam em BACKGROUND e são integradas
     na PRÓXIMA onda (passo 0) ou no COMMIT-FINAL. Elas NUNCA bloqueiam
-    o progresso das ondas de feature. Sem créditos = sem sub-agentes.
-    Sem créditos = sem sub-agentes.
+    o progresso das ondas de feature. Sem busca = sem sub-agentes.
   </final-note>
 
 </orchestrator>
