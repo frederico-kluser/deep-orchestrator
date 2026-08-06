@@ -366,6 +366,106 @@ search_brave() {
   echo "$results" > "$SEARCH_OUT_FILE"
 }
 
+# search_brave_api(): versão source-able de search_brave().
+# Idêntica em lógica, mas retorna códigos de status em vez de chamar exit.
+# Retorna: 0 = sucesso (resultados em $SEARCH_OUT_FILE), 1 = erro, 2 = erro de auth.
+# Usada por search.sh (Tier 2 do smart wrapper) via source.
+search_brave_api() {
+  local query="$1"
+  local retried="${2:-0}"
+  local body headers curl_err http_code rc err_msg results
+  body="$(mktemp)"
+  headers="$(mktemp)"
+  curl_err="$(mktemp)"
+
+  local args=( -sS --max-time "$TIMEOUT" -G "$API_URL"
+    -H "Accept: application/json"
+    -H "Accept-Encoding: gzip"
+    -H "X-Subscription-Token: ${BRAVE_API_KEY}"
+    --compressed
+    --data-urlencode "q=$query"
+    --data-urlencode "count=$COUNT"
+    --data-urlencode "offset=$OFFSET"
+    -D "$headers"
+    -o "$body"
+    -w '%{http_code}' )
+  [[ -n "$COUNTRY" ]]       && args+=( --data-urlencode "country=$COUNTRY" )
+  [[ -n "$SEARCH_LANG" ]]   && args+=( --data-urlencode "search_lang=$SEARCH_LANG" )
+  [[ -n "$FRESHNESS" ]]     && args+=( --data-urlencode "freshness=$FRESHNESS" )
+  [[ -n "$RESULT_FILTER" ]] && args+=( --data-urlencode "result_filter=$RESULT_FILTER" )
+
+  set +e
+  http_code="$(curl "${args[@]}" 2>"$curl_err")"
+  rc=$?
+  set -e
+
+  if [[ $rc -ne 0 ]]; then
+    echo "ERRO: falha de rede ao chamar a Brave API (curl exit $rc): $(cat "$curl_err")" >&2
+    rm -f "$body" "$headers" "$curl_err"
+    return 1
+  fi
+
+  LAST_HTTP="${http_code:-}"
+  LAST_CREDITS="$(credits_from_headers "$headers")"
+  LAST_RATE_REMAINING="$(header_val "$headers" "X-RateLimit-Remaining")"
+  LAST_RATE_RESET="$(header_val "$headers" "X-RateLimit-Reset")"
+  LAST_BILLING="$(header_val "$headers" "billing-status")"
+
+  case "${http_code:-}" in
+    200) ;;
+    401)
+      echo "ERRO: chave inválida (HTTP 401). Confira BRAVE_API_KEY." >&2
+      rm -f "$body" "$headers" "$curl_err"
+      return 2
+      ;;
+    402|403)
+      err_msg="$(api_error_message "$body")"
+      echo "ERRO: problema de faturamento/créditos na Brave API (HTTP $http_code): ${err_msg:-sem mensagem no corpo}" >&2
+      rm -f "$body" "$headers" "$curl_err"
+      return 1
+      ;;
+    429)
+      local wait_s="${LAST_RATE_RESET%%,*}"
+      wait_s="${wait_s//[^0-9]/}"
+      if (( retried < 1 )) && [[ -n "$wait_s" ]] && (( wait_s > 0 )) && (( wait_s <= 10 )); then
+        echo "AVISO: rate limit atingido (HTTP 429); aguardando ${wait_s}s e tentando de novo..." >&2
+        sleep "$wait_s"
+        rm -f "$body" "$headers" "$curl_err"
+        search_brave_api "$query" 1
+        return $?
+      fi
+      if (( retried >= 1 )); then
+        echo "ERRO: rate limit da Brave API (HTTP 429) persistiu após 1 tentativa de retry." >&2
+      else
+        echo "ERRO: rate limit da Brave API (HTTP 429) e reset indisponível/inválido." >&2
+      fi
+      rm -f "$body" "$headers" "$curl_err"
+      return 1
+      ;;
+    *)
+      err_msg="$(api_error_message "$body")"
+      echo "ERRO: resposta inesperada da Brave API (HTTP $http_code): ${err_msg:-corpo não-JSON}" >&2
+      rm -f "$body" "$headers" "$curl_err"
+      return 1
+      ;;
+  esac
+
+  # Corpo → array de resultados normalizados
+  if [[ -s "$body" ]]; then
+    if ! jq -e . "$body" >/dev/null 2>&1; then
+      echo "AVISO: HTTP 200 mas o corpo da resposta não é JSON válido (proxy/CDN/challenge?). Retornando 0 resultados (degradação)." >&2
+      results="[]"
+    else
+      results="$(jq -c '[.web.results // [] | .[] | select(.url != null and .url != "") | {title: (.title // ""), url: .url, description: (.description // ""), published: (.page_age // .age // ""), source: "brave"}]' "$body")"
+    fi
+  else
+    results="[]"
+  fi
+  rm -f "$body" "$headers" "$curl_err"
+  echo "$results" > "$SEARCH_OUT_FILE"
+  return 0
+}
+
 # --- Heurísticas de evolução ---------------------------------------------------
 # classify_feedback <results-json> → "empty" | "few" | "lowq" | "good"
 classify_feedback() {
@@ -582,5 +682,10 @@ main() {
   ALL_TMP=""
   SEARCH_OUT_FILE=""
 }
+
+# Quando sourceado (ex.: por search.sh), não executar main
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  return 0
+fi
 
 main "$@"
